@@ -1,5 +1,6 @@
 const API_CONFIG = {
   BASE_URL: process.env.REACT_APP_API_URL || 'http://localhost:8081/api',
+  AI_BASE_URL: process.env.REACT_APP_AI_URL || process.env.REACT_APP_API_URL || 'http://localhost:5000',
   TIMEOUT: process.env.REACT_APP_TIMEOUT || 30000,
   DEBUG: process.env.REACT_APP_DEBUG === 'true',
 };
@@ -12,8 +13,8 @@ export const API_ENDPOINTS = {
     REFRESH: '/v1/auth/refresh',
   },
   AI: {
-    PROCESS_PROMPT: '/v1/ai/process',
-    HEALTH: '/v1/ai/health',
+    PROCESS_PROMPT: '/api/v1/ai/process',
+    HEALTH: '/api/v1/ai/health',
   },
   ADMISSION: {
     APPLICATIONS: '/v1/admission/applications',
