@@ -1,0 +1,18 @@
+# Frontend
+frontend-react/node_modules/
+frontend-react/build/
+
+# Spring Boot compiled artifacts
+backend-spring-boot/target/
+
+# Python
+backend-python/__pycache__/
+backend-python/**/__pycache__/
+backend-python/*.pyc
+backend-python/.env
+
+# IDE / OS
+.idea/
+.vscode/
+*.DS_Store
+.claude/

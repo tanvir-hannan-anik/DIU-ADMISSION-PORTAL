@@ -8,7 +8,7 @@ class Config:
     GROQ_MODEL = os.getenv('GROQ_MODEL', 'mixtral-8x7b-32768')
     FLASK_ENV = os.getenv('FLASK_ENV', 'development')
     SERVICE_HOST = os.getenv('SERVICE_HOST', '0.0.0.0')
-    SERVICE_PORT = int(os.getenv('SERVICE_PORT', '5000'))
+    SERVICE_PORT = int(os.getenv('PORT', os.getenv('SERVICE_PORT', '5000')))
     MAX_TOKENS = int(os.getenv('MAX_TOKENS', '1024'))
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
     DEBUG = FLASK_ENV == 'development'
