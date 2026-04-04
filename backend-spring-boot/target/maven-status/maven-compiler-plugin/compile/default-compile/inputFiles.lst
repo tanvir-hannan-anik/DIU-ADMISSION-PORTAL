@@ -1,0 +1,16 @@
+D:\DIU\backend-spring-boot\src\main\java\com\university\UniversityAutomationApplication.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\config\CorsConfig.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\service\EmailService.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\controller\AIController.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\model\dto\ResponseWrapper.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\service\AIService.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\model\dto\AIPromptRequest.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\service\AdmissionService.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\model\entity\AdmissionApplication.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\exception\GlobalExceptionHandler.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\repository\AdmissionApplicationRepository.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\service\PythonServiceClient.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\controller\AdmissionController.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\config\RestTemplateConfig.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\model\dto\AdmissionApplicationRequest.java
+D:\DIU\backend-spring-boot\src\main\java\com\university\model\dto\AIPromptResponse.java

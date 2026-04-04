@@ -1,0 +1,73 @@
+from flask import Blueprint, request, jsonify
+import logging
+from app.services.groq_service import GroqService
+
+logger = logging.getLogger(__name__)
+bp = Blueprint('ai', __name__, url_prefix='/api/v1/ai')
+
+_groq_service = None
+
+def get_groq_service():
+    global _groq_service
+    if _groq_service is None:
+        try:
+            _groq_service = GroqService()
+            logger.info("Groq service initialized")
+        except (ValueError, Exception) as e:
+            logger.error(f"Groq service init failed: {e}")
+            return None
+    return _groq_service
+
+
+@bp.route('/process', methods=['POST'])
+def process_prompt():
+    try:
+        data = request.get_json()
+
+        if not data or not data.get('prompt'):
+            return jsonify({'success': False, 'message': 'Prompt is required', 'errorCode': 'VALIDATION_ERROR'}), 400
+
+        prompt = data.get('prompt', '').strip()
+        if len(prompt) < 3:
+            return jsonify({'success': False, 'message': 'Prompt too short', 'errorCode': 'VALIDATION_ERROR'}), 400
+
+        groq_service = get_groq_service()
+        if groq_service is None:
+            return jsonify({
+                'success': False,
+                'message': 'AI service not configured. Check GROQ_API_KEY in .env file.',
+                'errorCode': 'SERVICE_NOT_CONFIGURED'
+            }), 503
+
+        context = data.get('context', '')
+        module_type = data.get('moduleType', 'general')
+        user_id = data.get('userId', 'anonymous')
+        history = data.get('history', [])
+
+        logger.info(f"Processing prompt for user: {user_id}, module: {module_type}")
+
+        result = groq_service.process_prompt(
+            prompt=prompt,
+            context=context,
+            module_type=module_type,
+            history=history
+        )
+
+        return jsonify(result), 200
+
+    except RuntimeError as e:
+        logger.error(f"AI processing error: {str(e)}")
+        return jsonify({'success': False, 'message': str(e), 'errorCode': 'AI_ERROR'}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        return jsonify({'success': False, 'message': 'Internal server error', 'errorCode': 'INTERNAL_ERROR'}), 500
+
+
+@bp.route('/health', methods=['GET'])
+def health():
+    svc = get_groq_service()
+    return jsonify({
+        'status': 'healthy',
+        'groqConfigured': svc is not None,
+        'model': svc.model if svc else None
+    }), 200

@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: diu_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: university_automation
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - diu-net
+
+  python-service:
+    build: ./backend-python
+    container_name: diu_python_service
+    env_file: ./backend-python/.env
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mysql
+    networks:
+      - diu-net
+    restart: unless-stopped
+
+  spring-boot:
+    build: ./backend-spring-boot
+    container_name: diu_spring_boot
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/university_automation?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      PYTHON_SERVICE_URL: http://python-service:5000
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      python-service:
+        condition: service_started
+    networks:
+      - diu-net
+    restart: unless-stopped
+
+  react-frontend:
+    build: ./frontend-react
+    container_name: diu_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - spring-boot
+    networks:
+      - diu-net
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  diu-net:
+    driver: bridge

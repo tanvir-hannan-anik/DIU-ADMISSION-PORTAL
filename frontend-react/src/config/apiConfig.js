@@ -1,0 +1,27 @@
+const API_CONFIG = {
+  BASE_URL: process.env.REACT_APP_API_URL || 'http://localhost:8081/api',
+  TIMEOUT: process.env.REACT_APP_TIMEOUT || 30000,
+  DEBUG: process.env.REACT_APP_DEBUG === 'true',
+};
+
+export const API_ENDPOINTS = {
+  AUTH: {
+    LOGIN: '/v1/auth/login',
+    SIGNUP: '/v1/auth/signup',
+    LOGOUT: '/v1/auth/logout',
+    REFRESH: '/v1/auth/refresh',
+  },
+  AI: {
+    PROCESS_PROMPT: '/v1/ai/process',
+    HEALTH: '/v1/ai/health',
+  },
+  ADMISSION: {
+    APPLICATIONS: '/v1/admission/applications',
+    SUBMIT_APPLICATION: '/v1/admission/submit',
+    GET_APPLICATION: '/v1/admission/applications/:id',
+    STATS: '/v1/admission/stats',
+    UPDATE_STATUS: '/v1/admission/applications/:id/status',
+  },
+};
+
+export default API_CONFIG;
