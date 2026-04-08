@@ -11,6 +11,15 @@ import { PaymentPage } from './components/admission/PaymentPage';
 import { RegistrationConfirmPage } from './components/admission/RegistrationConfirmPage';
 import { StudentIDCardPage } from './components/admission/StudentIDCardPage';
 
+// Auth Pages
+import { LoginPage } from './components/auth/LoginPage';
+import { RegisterPage } from './components/auth/RegisterPage';
+import { SetPasswordPage } from './components/auth/SetPasswordPage';
+
+// Student Pages
+import { CourseRegistrationPage } from './components/student/CourseRegistrationPage';
+import { ProfilePage } from './components/student/ProfilePage';
+
 function App() {
   return (
     <Router>
@@ -20,6 +29,11 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
 
+          {/* Auth Routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/set-password" element={<SetPasswordPage />} />
+
           {/* Pre-Register Routes */}
           <Route path="/pre-register" element={<PreRegisterPage />} />
 
@@ -28,6 +42,10 @@ function App() {
           <Route path="/admission/payment" element={<PaymentPage />} />
           <Route path="/admission/confirmation" element={<RegistrationConfirmPage />} />
           <Route path="/admission/id-card" element={<StudentIDCardPage />} />
+
+          {/* Student Routes */}
+          <Route path="/course-registration" element={<CourseRegistrationPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
 
           {/* Admin */}
           <Route path="/admin/dashboard" element={<AdminDashboard />} />

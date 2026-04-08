@@ -32,6 +32,25 @@ export const Navigation = () => {
           >
             Programs
           </button>
+
+          {/* Show Student Portal & Course Registration before Admissions when logged in */}
+          {isAuthenticated && (
+            <>
+              <button
+                onClick={() => window.open('https://auth1.diu.edu.bd/realms/diu-student/protocol/openid-connect/auth?client_id=student-portal-ui&redirect_uri=https%3A%2F%2Fstudentportal.diu.edu.bd%2F&state=21f9f678-4c18-4451-b490-f5e2ff6cc0f5&response_mode=fragment&response_type=code&scope=openid&nonce=ab738521-dd74-4ef1-8139-7b95bc1fc8b7', '_blank')}
+                className="text-slate-200/70 hover:text-white transition-colors duration-300"
+              >
+                Student Portal
+              </button>
+              <button
+                onClick={() => navigate('/course-registration')}
+                className="text-slate-200/70 hover:text-white transition-colors duration-300"
+              >
+                Course Registration
+              </button>
+            </>
+          )}
+
           <button
             onClick={() => navigate('/')}
             className="text-slate-200/70 hover:text-white transition-colors duration-300"
@@ -62,12 +81,21 @@ export const Navigation = () => {
           </button>
 
           {isAuthenticated ? (
-            <button
-              onClick={handleLogout}
-              className="px-5 py-2 text-white border border-white/20 rounded-md hover:bg-white/10 transition-colors"
-            >
-              Logout
-            </button>
+            <>
+              <button
+                onClick={() => navigate('/profile')}
+                title="View Profile"
+                className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors"
+              >
+                <span className="material-symbols-outlined text-white text-xl">account_circle</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-5 py-2 text-red-400 border border-red-400/30 rounded-md hover:bg-red-400/10 transition-colors"
+              >
+                Logout
+              </button>
+            </>
           ) : (
             <button
               onClick={() => navigate('/login')}
@@ -96,6 +124,24 @@ export const Navigation = () => {
           >
             Programs
           </button>
+
+          {isAuthenticated && (
+            <>
+              <button
+                onClick={() => { window.open('https://auth1.diu.edu.bd/realms/diu-student/protocol/openid-connect/auth?client_id=student-portal-ui&redirect_uri=https%3A%2F%2Fstudentportal.diu.edu.bd%2F&state=21f9f678-4c18-4451-b490-f5e2ff6cc0f5&response_mode=fragment&response_type=code&scope=openid&nonce=ab738521-dd74-4ef1-8139-7b95bc1fc8b7', '_blank'); setIsMobileMenuOpen(false); }}
+                className="block w-full text-left text-slate-200/70 py-2 hover:text-white"
+              >
+                Student Portal
+              </button>
+              <button
+                onClick={() => { navigate('/course-registration'); setIsMobileMenuOpen(false); }}
+                className="block w-full text-left text-slate-200/70 py-2 hover:text-white"
+              >
+                Course Registration
+              </button>
+            </>
+          )}
+
           <button
             onClick={() => { navigate('/'); setIsMobileMenuOpen(false); }}
             className="block w-full text-left text-slate-200/70 py-2 hover:text-white"
@@ -114,6 +160,14 @@ export const Navigation = () => {
           >
             Campus Life
           </button>
+          {isAuthenticated && (
+            <button
+              onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}
+              className="block w-full text-left text-red-400 py-2 hover:text-red-300"
+            >
+              Logout
+            </button>
+          )}
         </div>
       )}
     </nav>

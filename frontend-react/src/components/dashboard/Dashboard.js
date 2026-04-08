@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Navigation } from '../common/Navigation';
 import { Footer } from '../common/Footer';
 import { useAI } from '../../hooks/useAI';
+import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'react-toastify';
 
 // ── Form Assistant Field Definitions ─────────────────────────────────────────
@@ -140,6 +141,30 @@ const HeroSection = () => {
 // Quick Access Cards Component
 const QuickAccessCards = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  const studentCards = [
+    {
+      id: 'student-portal',
+      title: 'Student Portal',
+      description: 'Access your student dashboard, academic records, results, and university services.',
+      icon: 'school',
+      buttonText: 'Open Portal',
+      action: () => window.open('https://auth1.diu.edu.bd/realms/diu-student/protocol/openid-connect/auth?client_id=student-portal-ui&redirect_uri=https%3A%2F%2Fstudentportal.diu.edu.bd%2F&state=21f9f678-4c18-4451-b490-f5e2ff6cc0f5&response_mode=fragment&response_type=code&scope=openid&nonce=ab738521-dd74-4ef1-8139-7b95bc1fc8b7', '_blank'),
+      accentColor: 'text-primary',
+      darkText: false,
+    },
+    {
+      id: 'course-registration',
+      title: 'Course Registration',
+      description: 'Register for your upcoming semester courses, manage your academic schedule and credit hours.',
+      icon: 'menu_book',
+      buttonText: 'Register Courses',
+      action: () => navigate('/course-registration'),
+      accentColor: 'text-slate-700',
+      darkText: false,
+    },
+  ];
 
   const cards = [
     {
@@ -174,68 +199,93 @@ const QuickAccessCards = () => {
     },
   ];
 
+  const renderCard = (card) => (
+    <div
+      key={card.id}
+      className={`group p-8 rounded-xl ${
+        card.darkText ? 'text-white bg-primary' : 'text-on-surface bg-surface-container-low'
+      } hover:${card.darkText ? 'shadow-2xl shadow-primary/20' : 'bg-surface-container'} transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[280px]`}
+    >
+      <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all">
+        <span
+          className="material-symbols-outlined text-8xl"
+          style={{ fontVariationSettings: "'FILL' 1" }}
+        >
+          {card.icon}
+        </span>
+      </div>
+
+      <div>
+        <div className={`w-14 h-14 ${
+          card.darkText ? 'bg-white/10' : 'bg-primary/10'
+        } rounded-lg flex items-center justify-center ${
+          card.darkText ? 'text-primary-fixed' : 'text-primary'
+        } mb-6`}>
+          <span className="material-symbols-outlined">{card.icon}</span>
+        </div>
+
+        <h3 className="text-2xl font-bold font-headline mb-2">
+          {card.title}
+        </h3>
+        <p className={`${
+          card.darkText ? 'text-slate-200/70' : 'text-outline'
+        } text-sm leading-relaxed mb-6`}>
+          {card.description}
+        </p>
+      </div>
+
+      <button
+        onClick={card.action}
+        className={`${card.accentColor} font-bold flex items-center gap-2 group/link hover:gap-4 transition-all`}
+      >
+        {card.buttonText}
+        <span className="material-symbols-outlined group-hover/link:translate-x-1 transition-transform">
+          chevron_right
+        </span>
+      </button>
+    </div>
+  );
+
   return (
     <section className="py-24 bg-surface px-8">
       <div className="max-w-screen-2xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
-          <div>
-            <h2 className="font-headline text-3xl font-bold tracking-tight text-on-surface mb-2">
-              Admission Hub
-            </h2>
-            <p className="text-outline max-w-md">
-              Access vital tools and portals to manage your admission process.
-            </p>
+
+        {/* Student Portal & Course Registration — only for logged-in students */}
+        {isAuthenticated && (
+          <div className="mb-20">
+            <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
+              <div>
+                <h2 className="font-headline text-3xl font-bold tracking-tight text-on-surface mb-2">
+                  Student Services
+                </h2>
+                <p className="text-outline max-w-md">
+                  Quick access to your student portal and course management tools.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {studentCards.map(renderCard)}
+            </div>
+          </div>
+        )}
+
+        {/* Admission Hub */}
+        <div>
+          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
+            <div>
+              <h2 className="font-headline text-3xl font-bold tracking-tight text-on-surface mb-2">
+                Admission Hub
+              </h2>
+              <p className="text-outline max-w-md">
+                Access vital tools and portals to manage your admission process.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {cards.map(renderCard)}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {cards.map((card) => (
-            <div
-              key={card.id}
-              className={`group p-8 rounded-xl ${
-                card.darkText ? 'text-white bg-primary' : 'text-on-surface bg-surface-container-low'
-              } hover:${card.darkText ? 'shadow-2xl shadow-primary/20' : 'bg-surface-container'} transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[280px]`}
-            >
-              <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all">
-                <span
-                  className="material-symbols-outlined text-8xl"
-                  style={{ fontVariationSettings: "'FILL' 1" }}
-                >
-                  {card.icon}
-                </span>
-              </div>
-
-              <div>
-                <div className={`w-14 h-14 ${
-                  card.darkText ? 'bg-white/10' : 'bg-primary/10'
-                } rounded-lg flex items-center justify-center ${
-                  card.darkText ? 'text-primary-fixed' : 'text-primary'
-                } mb-6`}>
-                  <span className="material-symbols-outlined">{card.icon}</span>
-                </div>
-
-                <h3 className="text-2xl font-bold font-headline mb-2">
-                  {card.title}
-                </h3>
-                <p className={`${
-                  card.darkText ? 'text-slate-200/70' : 'text-outline'
-                } text-sm leading-relaxed mb-6`}>
-                  {card.description}
-                </p>
-              </div>
-
-              <button
-                onClick={card.action}
-                className={`${card.accentColor} font-bold flex items-center gap-2 group/link hover:gap-4 transition-all`}
-              >
-                {card.buttonText}
-                <span className="material-symbols-outlined group-hover/link:translate-x-1 transition-transform">
-                  chevron_right
-                </span>
-              </button>
-            </div>
-          ))}
-        </div>
       </div>
     </section>
   );
@@ -647,6 +697,87 @@ const useChatMessages = () => {
   return { messages, inputValue, setInputValue, isLoading, sendMessage: (text) => sendMessage(text, messages), handleSubmit, formMode, formProgress, formFieldIndex, totalFormFields: currentFormFields.length, startFormMode };
 };
 
+// Render inline text: **bold** → <strong>
+function renderInline(text, key) {
+  const parts = text.split(/\*\*(.*?)\*\*/g);
+  return (
+    <React.Fragment key={key}>
+      {parts.map((part, i) => i % 2 === 1 ? <strong key={i}>{part}</strong> : part)}
+    </React.Fragment>
+  );
+}
+
+// Parse markdown table lines into a <table>
+function renderTable(lines, key) {
+  const rows = lines
+    .filter(l => !/^\s*\|?\s*[-:]+[-| :]*\s*\|?\s*$/.test(l)) // drop separator rows
+    .map(l => l.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim()));
+
+  if (!rows.length) return null;
+  const [head, ...body] = rows;
+  return (
+    <div key={key} className="overflow-x-auto my-2 rounded-lg border border-outline-variant/30">
+      <table className="w-full text-xs border-collapse">
+        <thead>
+          <tr className="bg-primary text-white">
+            {head.map((cell, i) => (
+              <th key={i} className="px-3 py-2 text-left font-semibold border-r border-white/20 last:border-r-0 whitespace-nowrap">
+                {renderInline(cell, i)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {body.map((row, ri) => (
+            <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-surface-container-low'}>
+              {row.map((cell, ci) => (
+                <td key={ci} className="px-3 py-2 border-t border-outline-variant/20 border-r border-outline-variant/20 last:border-r-0">
+                  {renderInline(cell, ci)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Parse message text into blocks: tables, and normal lines
+function renderMessageContent(text) {
+  const lines = text.split('\n');
+  const blocks = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    // Detect start of a markdown table (line with | pipe chars)
+    if (/^\|.+\|/.test(lines[i].trim())) {
+      const tableLines = [];
+      while (i < lines.length && /\|/.test(lines[i])) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      blocks.push({ type: 'table', lines: tableLines });
+    } else {
+      blocks.push({ type: 'line', text: lines[i] });
+      i++;
+    }
+  }
+
+  return blocks.map((block, bi) => {
+    if (block.type === 'table') {
+      return renderTable(block.lines, `table-${bi}`);
+    }
+    // Normal line with inline bold
+    return (
+      <React.Fragment key={`line-${bi}`}>
+        {renderInline(block.text, bi)}
+        {bi < blocks.length - 1 && block.type === 'line' && <br />}
+      </React.Fragment>
+    );
+  });
+}
+
 // Message list renderer
 const MessageList = ({ messages, isLoading, messagesEndRef }) => (
   <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -662,9 +793,7 @@ const MessageList = ({ messages, isLoading, messagesEndRef }) => (
             ? 'bg-primary text-white rounded-br-sm'
             : 'bg-surface-container-low text-on-surface rounded-bl-sm border border-outline-variant/20'
         }`}>
-          {message.text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').split('\n').map((line, i, arr) => (
-            <React.Fragment key={i}>{line}{i < arr.length - 1 && <br />}</React.Fragment>
-          ))}
+          {message.type === 'bot' ? renderMessageContent(message.text) : message.text}
           <div className={`text-[10px] mt-1 ${message.type === 'user' ? 'text-white/60' : 'text-outline'}`}>
             {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>

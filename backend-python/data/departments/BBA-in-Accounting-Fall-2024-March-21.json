@@ -1,0 +1,63 @@
+{
+  "department": "BBA in Accounting",
+  "short_name": "BBA",
+  "faculty": "Faculty of Business and Entrepreneurship",
+  "degree": "BBA",
+  "duration": "4 years",
+  "total_credit": "133",
+  "overview": "The Department of Accounting is at the vanguard of this change, bringing cutting-edge technology into every aspect of our program. From blockchain and artificial intelligence to data analytics and cloud computing, we provide our pupils with the skills and knowledge they need to succeed in their accounting profession of today's digital era.",
+  "semester_fee": {
+    "Semester 1-12 Cr. (Level-1, Semester-1)": "99,300",
+    "Semester 2-12 Cr. (Level-1, Semester-2)": "65,300"
+  },
+  "total_fee": "761,400",
+  "admission_fee": "20,000",
+  "waiver_info": "Result-based waiver (bachelor's), Waiver on SGPA (semester result), Female quota, Need-based, Quota for physically challenged/specially-abled, tribal/ethnic group quota, Sibling/spouse and son/daughter of current students quota, Waiver for DIU alumni, Group admission quota, Freedom fighter quota, And many more.",
+  "eligibility": "Students having a minimum GPA of 2.5 both in SSC and HSC or equivalent background from any group may apply for admission in the BBA in Accounting. Information Systems. Completing five O-level subjects with at least GPA 2.5 and at least two A-Level subjects with at least GPA 2.5 (Below C grade in any subject is not acceptable) may apply for admission.",
+  "labs": [
+    "Accounting Software Lab",
+    "Computer Lab for Financial Modeling",
+    "Machine Learning Lab",
+    "AI Lab",
+    "Programming Lab",
+    "Cyber Security Lab"
+  ],
+  "curriculum_highlights": [
+    "Principles of Accounting",
+    "Advanced Financial Accounting",
+    "Corporate tax and VAT in Bangladesh",
+    "Audit and Assurance",
+    "Advanced Management Accounting",
+    "Digital Accounting",
+    "Financial Reporting and Analysis",
+    "Governmental & Non-Profit Accounting",
+    "Forensic and Cyber Security in Accounting",
+    "Accounting Information Systems",
+    "Advanced Financial Accounting",
+    "Accounting Theory and Standard",
+    "Forensic Accounting and Financial Fraud Investigation",
+    "Sustainable Development",
+    "E-Business management and Entrepreneurship Development",
+    "Application of Python in Business",
+    "Introduction to Cyber Security for Business",
+    "Database Management and Decision Support Systems",
+    "Business Analytics for Data-Driven Decision Making",
+    "Artificial Intelligence for Business",
+    "Spreadsheet Analysis, Modeling and Accounting Software",
+    "Ethics and Corporate Issues",
+    "Career Planning and Development (Employability 360)",
+    "Management Information Systems"
+  ],
+  "career_opportunities": [],
+  "research_areas": [],
+  "projects": [],
+  "facilities": [
+    "One Student One Laptop"
+  ],
+  "events": [],
+  "notable_alumni_companies": [],
+  "contact": "+880 961 790 1212, admission@daffodiluniversity.edu.bd, daffodiluniversity.edu.bd, / @daffodiluniversity.edu.bd",
+  "intake": "Spring 2025",
+  "_source_file": "BBA-in-Accounting-Fall-2024-March-21.jpg",
+  "_processed_at": "2026-04-08T20:00:05.334986"
+}

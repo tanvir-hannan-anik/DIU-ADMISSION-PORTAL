@@ -1,0 +1,69 @@
+{
+  "department": "Bachelor of Tourism and Hospitality Management",
+  "short_name": "BTHM",
+  "faculty": "Faculty of Business & Entrepreneurship",
+  "degree": "Bachelor of Tourism and Hospitality Management",
+  "duration": "4 years",
+  "total_credit": "130",
+  "overview": "The BTHM program provides education and training to produce skilled manpower for tourism and hospitality industry. The program involves providing services to other businesses as well as final consumers.",
+  "semester_fee": {
+    "Semester 1-12 Cr": "93,500",
+    "Semester 2-12 Cr": "69,050"
+  },
+  "total_fee": "698,500",
+  "admission_fee": "20,000",
+  "waiver_info": [
+    "Waiver on SGPA (semester result)",
+    "Female quota",
+    "Need-based",
+    "Quota for DU students",
+    "Physically challenged/specially-abled, tribal/ethnic group quota",
+    "Sibling/spouse and son/daughter of current students quota",
+    "Waiver for DIU alumni",
+    "Group admission quota",
+    "Freedom fighter quota",
+    "And many more"
+  ],
+  "eligibility": "A higher secondary certificate or its equivalent in Science, Arts, Commerce or other fields of study. The basic educational requirement for admission having at least 2.5 GPA in both SSC & HSC level may apply for admission. 0 level students completing five O-level subjects and at least two A-level subjects out of these 7 subjects must have minimum 'B' grade 3rd C grade",
+  "labs": [
+    "Food Safety, Hygiene, and Sanitation Lab",
+    "Information Communication and Technology (ICT) Lab",
+    "Employability Skill 360"
+  ],
+  "curriculum_highlights": [
+    "Basic English Language",
+    "Introduction to Business",
+    "Information Communication and Technology (ICT)",
+    "Introduction to Management",
+    "Bangladesh Studies",
+    "Introduction to Accounting",
+    "Principles of Marketing",
+    "Introduction to Economics",
+    "Principles of Finance",
+    "Business Statistics",
+    "Business Communication",
+    "Entrepreneurship",
+    "Employability Skill 360",
+    "Art of Living",
+    "History of the Emergence of Bangladesh",
+    "Bangla Language and Literature",
+    "Destination Management and Marketing",
+    "Digital Marketing",
+    "Geographic information System"
+  ],
+  "career_opportunities": [
+    "Careers exist for graduates from hospitality-related disciplines in managing hotels, restaurants, public houses, conference centers, accommodation and catering operations, as well as in customer services' management across a range of industries.",
+    "The leisure industry also covers sport and entertainment and additional avenues of employment in sport and fitness centers, cinemas and theatres as well as other leisure venues such as bowling alleys and theme parks. Other customer service focused roles in tour and travel management and events management may also be of interest.",
+    "Careers like travel agency manager or travel consultant, tour manager, guide or tour escort, and tour operator are also available.",
+    "May become an entrepreneur in the service industry like Tour Entrepreneur, Club Entrepreneur, Travel Consultant, Events Manager, Restaurant / Hotel Owner etc."
+  ],
+  "research_areas": [],
+  "projects": [],
+  "facilities": [],
+  "events": [],
+  "notable_alumni_companies": [],
+  "contact": "+880 961 790 1212",
+  "intake": "Spring: Jan-Apr | Summer: May-Aug | Fall: Sep-Dec",
+  "_source_file": "Bachelor-in-THM.jpg",
+  "_processed_at": "2026-04-08T19:59:15.310435"
+}

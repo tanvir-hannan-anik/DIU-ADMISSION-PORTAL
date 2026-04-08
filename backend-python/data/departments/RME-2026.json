@@ -1,0 +1,50 @@
+{
+  "department": "Robotics and Mechatronics Engineering",
+  "short_name": "RME",
+  "faculty": "Faculty of Engineering",
+  "degree": "B.Sc.",
+  "duration": "4 years / 12 semesters",
+  "total_credit": "",
+  "overview": "This discipline covers robot design, automation, AI integration, machine control, and smart system development—skills that are essential for future industries.",
+  "semester_fee": "81,700 - 105,500 BDT",
+  "total_fee": "937,950 BDT",
+  "admission_fee": "20,000 BDT",
+  "waiver_info": "Waiver/Scholarship Facilities of DIU: Result-based waiver (Bachelor's), Waiver on SGPA (Semester result), Female quota, Need-based, Player quota, Physically challenged/specially-abled, tribal/ethnic group quota, Sibling/spouse and son/daughter of current students quota, Waiver for DIU alumni, Group admission quota, Freedom fighter quota, And many more.",
+  "eligibility": "Students having a minimum 2.5 GPA both in Secondary School Certificate (SSC) and Higher Secondary Certificate (HSC) 12 class passed. Equivalent to two A-level subjects and at least two A-level subjects may apply. Out of these 5 subjects, applicants must have a minimum 4 'B' grade & 3 'C' grade respectively. The applicants must have Physics and Mathematics both at O-level and A-level.",
+  "labs": [
+    "Robotics",
+    "Automation & P.L.C.",
+    "Microcontroller & Embedded Systems",
+    "IoT & Sensor",
+    "Drone & Uav",
+    "Thesis & AI labs",
+    "CNC machines",
+    "Modern mechanical workshop"
+  ],
+  "curriculum_highlights": [
+    "Machine Learning Algorithms",
+    "Industrial Training",
+    "Digital Signal Processing",
+    "Power Electronics and Drives",
+    "Deep Learning",
+    "Physics Variables and Harmonic Analysis",
+    "Signals and Linear Systems",
+    "Numerical Methods",
+    "Fundamentals of Programming",
+    "Object Oriented Programming",
+    "Fundamentals of Electrical and Electronic Engineering"
+  ],
+  "career_opportunities": [],
+  "research_areas": [],
+  "projects": [
+    "Capstone Project-I",
+    "Capstone Project-II"
+  ],
+  "facilities": [],
+  "events": [],
+  "notable_alumni_companies": [],
+  "contact": "Admission Helpline: +880 961 790 1212, daffodil.edu.bd / admission.daffodiluniversity.edu.bd, Daffodil Smart City, Birulia, Savar, Dhaka 1216",
+  "intake": "Spring: Jan-Apr | Summer: May-Aug | Fall: Sep-Dec",
+  "_source_file": "RME-2026.jpg",
+  "_processed_at": "2026-04-08T20:03:53.165656"
+}

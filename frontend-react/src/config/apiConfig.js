@@ -9,12 +9,15 @@ export const API_ENDPOINTS = {
   AUTH: {
     LOGIN: '/v1/auth/login',
     SIGNUP: '/v1/auth/signup',
+    REGISTER: '/v1/auth/register',
+    VERIFY: '/v1/auth/verify',
+    SET_PASSWORD: '/v1/auth/set-password',
     LOGOUT: '/v1/auth/logout',
     REFRESH: '/v1/auth/refresh',
   },
   AI: {
     PROCESS_PROMPT: '/api/v1/ai/process',
-    HEALTH: '/api/v1/ai/health',
+    HEALTH: '/api/v1/health/check',
   },
   ADMISSION: {
     APPLICATIONS: '/v1/admission/applications',

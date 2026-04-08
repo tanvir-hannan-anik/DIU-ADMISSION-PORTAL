@@ -1,6 +1,7 @@
 import logging
 from groq import Groq
 from app.config.settings import Config
+from app.services.knowledge_base_service import get_kb_for_query
 
 logger = logging.getLogger(__name__)
 
@@ -18,163 +19,7 @@ UNIVERSITY OVERVIEW
 - Contact: admission@daffodilvarsity.edu.bd
 - Apply: https://admission.daffodilvarsity.edu.bd
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DEPARTMENT DATA (REAL FEES & DETAILS)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-=== FACULTY OF SCIENCE AND INFORMATION TECHNOLOGY ===
-
-📌 Computer Science and Engineering (CSE)
-  • Duration: 4 years | 12 semesters | 154.5 credits
-  • Semester Fee: BDT 85,000 | Total Fee: BDT 10,20,450
-  • Admission Fee: BDT 25,000 | Lab Fee: BDT 8,000/sem | Exam Fee: BDT 5,000/sem
-  • Demand: ⭐ Very High | Difficulty: Hard | Job Conversion Rate: 85%
-  • Labs: AI Lab, IoT Lab, Networking Lab, Software Engineering Lab
-  • Curriculum: Programming Fundamentals, Data Structures, Algorithms, OS, AI, Machine Learning
-  • Careers: Software Engineer, AI Engineer, Backend Developer, Cloud Engineer, Data Scientist
-  • Alumni at: Google, Microsoft, Samsung, Brain Station 23
-  • Events: Hackathon, Programming Contest, AI Workshop
-  • Research: Yes
-  • Eligibility: Science group, SSC+HSC GPA ≥ 2.5 each, Math required
-
-📌 Software Engineering (SWE)
-  • Duration: 4 years | 12 semesters
-  • Semester Fee: BDT 78,000 | Total Fee: BDT 9,52,500
-  • Demand: ⭐ Very High | Job Conversion Rate: 82%
-  • Labs: Software Testing Lab, Agile Development Lab
-  • Specializations available: Cyber Security, Data Science, Robotics
-  • Careers: Software Engineer, QA Engineer, DevOps Engineer
-  • Research: Yes
-  • Eligibility: Science group, SSC+HSC GPA ≥ 2.5
-
-📌 Computing and Information System (CIS)
-  • Duration: 4 years | 12 semesters | 148 credits
-  • Semester Fee: BDT 70,000 | Total Fee: BDT 8,90,000
-  • Demand: High | Difficulty: Medium | Job Conversion Rate: 80%
-  • Focus: AI, Business Intelligence, Data Analytics, Information Systems
-  • Labs: AI Lab, Business Intelligence Lab
-  • Tools: Python, Power BI, Tableau, TensorFlow, Scikit-learn, SQL, Excel Analytics
-  • Curriculum: Programming, DBMS, AI, Machine Learning, Business Intelligence, Data Mining, Cloud Computing, Big Data Analytics
-  • Careers: AI Engineer, Data Analyst, BI Developer, ML Engineer, System Analyst, Data Engineer
-  • Projects: Student Performance Prediction using AI, Sales Forecasting Dashboard, AI Chatbot, BI Analytics System
-  • vs CSE: More data/AI focused, less hardcore system programming
-  • vs SWE: More analytics and BI oriented
-  • Eligibility: Any group (Science preferred), GPA ≥ 2.5, Math preferred
-
-📌 Multimedia and Creative Technology (MCT)
-  • Duration: 4 years
-  • Semester Fee: BDT 68,000
-  • Demand: Medium | Job Conversion Rate: 70%
-  • Careers: UI Designer, Animator, Video Editor, Content Creator
-  • Eligibility: Any group, GPA ≥ 2.5
-
-📌 Information Technology & Management (ITM)
-  • Duration: 4 years
-  • Demand: Medium
-  • Careers: IT Manager, Systems Administrator, Project Manager
-  • Eligibility: Any group, GPA ≥ 2.5
-
-📌 Robotics and Mechatronics Engineering
-  • Duration: 4 years
-  • Demand: High (emerging field)
-  • Careers: Robotics Engineer, Automation Engineer, Hardware Engineer
-  • Eligibility: Science group, GPA ≥ 2.5
-
-=== FACULTY OF BUSINESS & ENTREPRENEURSHIP ===
-
-📌 Bachelor of Business Administration (BBA)
-  • Duration: 4 years
-  • Semester Fee: BDT 65,000 | Total Fee: BDT 7,89,575
-  • Demand: High | Job Conversion Rate: 75%
-  • Careers: Manager, Entrepreneur, Business Analyst, Consultant
-  • Eligibility: Any group, GPA ≥ 2.5
-
-📌 Finance and Banking
-  • Duration: 4 years
-  • Semester Fee: BDT 66,000
-  • Demand: High
-  • Careers: Banker, Financial Analyst, Investment Officer
-  • Eligibility: Any group, GPA ≥ 2.5
-
-📌 Marketing
-  • Duration: 4 years
-  • Semester Fee: BDT 64,000
-  • Demand: Medium
-  • Careers: Marketing Manager, Brand Manager, Digital Marketer
-  • Eligibility: Any group, GPA ≥ 2.5
-
-📌 Financial Technology (FinTech)
-  • Duration: 4 years
-  • Demand: Very High (emerging)
-  • Careers: FinTech Developer, Digital Banking Specialist, Blockchain Analyst
-
-📌 BBA in Accounting | Bachelor of Real Estate | Bachelor of Tourism & Hospitality Management (BTHM) | Bachelor of Entrepreneurship (BE)
-  • Duration: 4 years each
-  • Demand: Medium–High
-
-=== FACULTY OF ENGINEERING ===
-
-📌 Electrical and Electronic Engineering (EEE)
-  • Duration: 4 years
-  • Semester Fee: BDT 82,000
-  • Demand: High
-  • Careers: Electrical Engineer, Embedded Systems Engineer, Power Engineer
-  • Eligibility: Science group, GPA ≥ 2.5
-
-📌 Civil Engineering (CE)
-  • Duration: 4 years
-  • Semester Fee: BDT 80,000
-  • Demand: High
-  • Careers: Civil Engineer, Structural Engineer, Urban Planner
-  • Eligibility: Science group, GPA ≥ 2.5
-
-📌 Information & Communication Engineering (ICE)
-  • Duration: 4 years
-  • Demand: High
-  • Eligibility: Science group, GPA ≥ 2.5
-
-📌 Textile Engineering (TE)
-  • Duration: 4 years
-  • Demand: High (Bangladesh garment industry)
-  • Eligibility: Science group, GPA ≥ 2.5
-
-📌 Bachelor of Architecture (B.Arch.)
-  • Duration: 5 years
-  • Demand: Medium–High
-  • Eligibility: Science group, GPA ≥ 2.5
-
-=== FACULTY OF HEALTH AND LIFE SCIENCES ===
-
-📌 Bachelor of Pharmacy (B.Pharm)
-  • Duration: 5 years
-  • Semester Fee: BDT 1,35,000 | Total Fee: BDT 10,82,500
-  • Demand: High
-  • Careers: Pharmacist, Drug Researcher, Clinical Pharmacist
-  • Eligibility: Science group with Biology, SSC+HSC GPA ≥ 3.0
-
-📌 Public Health (BPH)
-  • Duration: 4 years
-  • Semester Fee: BDT 60,000
-  • Demand: Medium
-  • Eligibility: Science group, GPA ≥ 2.5
-
-📌 Other Health Programs: Environmental Science & Disaster Management (ESDM), Nutrition and Food Engineering (NFE), Physical Education & Sports Science (PESS), Agricultural Science, Genetic Engineering & Biotechnology, Fisheries
-  • Demand: Medium
-  • Eligibility: Science group, GPA ≥ 2.5
-
-=== FACULTY OF HUMANITIES & SOCIAL SCIENCES ===
-
-📌 B.A. (Hons) in English
-  • Demand: Medium
-  • Eligibility: Any group, GPA ≥ 2.0
-
-📌 LL.B. (Hons.) — Law
-  • Demand: Medium–High
-  • Eligibility: Any group, GPA ≥ 2.0
-
-📌 BSS in Journalism, Media and Communication (JMC)
-  • Demand: Medium
-  • Eligibility: Any group, GPA ≥ 2.0
+{DEPARTMENT_KB}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TUITION FEE & WAIVER CALCULATION
@@ -273,7 +118,13 @@ YOUR RESPONSIBILITIES
    Ask for SSC GPA, HSC GPA, and group → check against rules → show ✅ Eligible or ❌ Not Eligible with clear reason.
 
 5. DEPARTMENT COMPARISON
-   Side-by-side table: fees, demand, difficulty, job rate, labs, research scope.
+   Use a proper markdown table with | pipe characters for side-by-side comparisons.
+   CRITICAL: If the user mentions multiple departments (e.g. CIS, CSE, SWE), include ALL of them as columns — never drop any department the user listed.
+   Example format:
+   | Feature | CSE | CIS | SWE |
+   |---------|-----|-----|-----|
+   | Degree | B.Sc. | B.Sc. | B.Sc. |
+   | Semester Fee | BDT X | BDT X | BDT X |
 
 6. FACILITIES INFO
    Describe labs, transport, hostel, library, clubs, scholarships, career support.
@@ -291,7 +142,7 @@ CONVERSATION RULES
 - Keep replies 150–300 words unless a detailed comparison/calculation is needed
 - Always gently steer toward completing admission
 - Use emojis sparingly: ✅ ❌ 📚 💡 🎓 💰 to make responses friendly
-- NEVER use markdown bold (**text**) or italic (*text*) — plain text only, no asterisks
+- FORMATTING: Use **bold** (double asterisks) for section titles and key labels like **Degree:**, **Semester Fee:**, **Eligibility:**, **Careers:**, **Duration:** etc. Never use single asterisks (*) for italic.
 - If unsure about something not in your data, say so and suggest contacting admission@daffodilvarsity.edu.bd
 
 PRIMARY GOAL: Help every student find the right department and successfully complete admission at DIU.
@@ -307,9 +158,23 @@ class GroqService:
         self.max_tokens = Config.MAX_TOKENS
         logger.info(f"Groq service initialized - model: {self.model}")
 
+    def _build_system_prompt(self, query: str = "") -> str:
+        kb = get_kb_for_query(query) if query else ""
+        if kb:
+            return SYSTEM_PROMPT.replace("{DEPARTMENT_KB}", kb, 1)
+        return SYSTEM_PROMPT.replace(
+            "{DEPARTMENT_KB}",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "DEPARTMENT DATA\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "Department data is still loading. For accurate fees and details,\n"
+            "advise students to contact admission@daffodilvarsity.edu.bd.\n",
+            1
+        )
+
     def process_prompt(self, prompt: str, context: str = None, module_type: str = None, history: list = None) -> dict:
         try:
-            messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            messages = [{"role": "system", "content": self._build_system_prompt(prompt)}]
 
             if history:
                 for msg in history:

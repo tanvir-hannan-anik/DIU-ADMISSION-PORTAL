@@ -11,6 +11,9 @@ backend-python/**/__pycache__/
 backend-python/*.pyc
 backend-python/.env
 
+# Department flyer images (large binary files — not tracked in git)
+department details/
+
 # IDE / OS
 .idea/
 .vscode/

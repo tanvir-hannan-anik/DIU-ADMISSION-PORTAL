@@ -1,0 +1,85 @@
+{
+  "department": "Electrical & Electronic Engineering",
+  "short_name": "EEE",
+  "faculty": "Faculty of Engineering",
+  "degree": "B.Sc.",
+  "duration": "4 years / 8 semesters",
+  "total_credit": "",
+  "overview": "The Department of Electrical & Electronic Engineering (EEE) under the Faculty of Engineering (FE) of Daffodil International University (DIU) was established in the year 2009 after getting approval from University Grant Commission (UGC). It is one of the largest and fast-growing departments of this University. The EEE department provides all necessary facilities to the students including well-equipped laboratories.",
+  "semester_fee": {
+    "semester_1_to_12_or_level_1_term_1": 98250,
+    "semester_2_to_13_or_level_1_term_2": 70250
+  },
+  "total_fee": 842000,
+  "admission_fee": 20000,
+  "waiver_info": [
+    "Result-based waiver (SSC and HSC)",
+    "Waiver on SGPA (semester result)",
+    "Female quota waiver",
+    "Need-based waiver",
+    "Player quota waiver",
+    "Physically challenged/specially-abled, tribal/ethnic group quota",
+    "Sibling/spouse and son/daughter of current students quota",
+    "Waiver for DIU alumni",
+    "Group admission waiver from the same organization",
+    "Freedom fighter quota waiver",
+    "Talent hunt scholarship program",
+    "Special waiver for international students"
+  ],
+  "eligibility": "Students having a minimum 2.5 GPA both in Secondary School Certificate (SSC) and Higher Secondary Certificate (HSC) or 12 class passed Equivalent from Science stream with major in Physics, Mathematics and English may apply for admission.",
+  "labs": [
+    "Power System Analysis Laboratory",
+    "Electronics Laboratory",
+    "Electrical Circuits Laboratory",
+    "Control Systems Laboratory",
+    "Digital Signal Processing Laboratory",
+    "Energy Conversion Laboratory",
+    "Circuit Simulation Laboratory",
+    "Microcontroller and Interfacing Laboratory",
+    "Industrial Automation and Robotics",
+    "Project Management and Finance"
+  ],
+  "curriculum_highlights": [
+    "Electrical Circuits I",
+    "Physics",
+    "Differential and Integral Calculus",
+    "Electrical Circuits II",
+    "Chemistry",
+    "Digital Electronics",
+    "Electrical Properties of Materials",
+    "Measurement and Instrumentation",
+    "Digital Signal Processing",
+    "Power System Analysis",
+    "Industrial Drives and Control",
+    "Power Electronics",
+    "Elective I (Major)",
+    "Industrial Training",
+    "Microprocessor and Interfacing",
+    "Electric Power Distribution",
+    "Power Stations and Substations",
+    "Elective II (Minor)",
+    "Professional English III",
+    "Capstone Project (Phase-2)",
+    "Elective I (Minor)",
+    "Elective II (Major)",
+    "Capstone Project (Phase-3)"
+  ],
+  "career_opportunities": [],
+  "research_areas": [],
+  "projects": [
+    "Capstone Project (Phase-1)",
+    "Capstone Project (Phase-2)",
+    "Capstone Project (Phase-3)"
+  ],
+  "facilities": [
+    "well-equipped laboratories"
+  ],
+  "events": [],
+  "notable_alumni_companies": [
+    "PAB, PDB, EEEGS, REB, DESCO, DPDC along with other government and non-government organizations"
+  ],
+  "contact": "+880 961790 1212 | admission@daffodiluniversity.edu.bd",
+  "intake": "Spring 2026",
+  "_source_file": "BSc-in-EEE.jpg",
+  "_processed_at": "2026-04-08T20:05:01.023863"
+}
