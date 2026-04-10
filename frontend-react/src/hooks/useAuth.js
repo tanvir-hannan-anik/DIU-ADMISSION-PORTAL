@@ -26,10 +26,10 @@ export const useAuth = () => {
     }
   }, []);
 
-  const signup = useCallback(async (userData) => {
+  const register = useCallback(async (userData) => {
     setLoading(true);
     try {
-      const result = await authService.signup(userData);
+      const result = await authService.register(userData);
       if (result.success) {
         setUser(result.data.user);
         setIsAuthenticated(true);
@@ -51,7 +51,7 @@ export const useAuth = () => {
     isAuthenticated,
     loading,
     login,
-    signup,
+    register,
     logout,
   };
 };

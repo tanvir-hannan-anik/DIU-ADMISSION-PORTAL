@@ -1,228 +1,366 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authService } from '../../services/authService';
+import { useAuth } from '../../hooks/useAuth';
 
 export const RegisterPage = () => {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
+  const { register } = useAuth();
 
-  const [email, setEmail] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [form, setForm]               = useState({ name: '', email: '', studentId: '', password: '', confirm: '' });
+  const [showPass, setShowPass]       = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [agreed, setAgreed]           = useState(false);
+  const [error, setError]             = useState('');
+  const [loading, setLoading]         = useState(false);
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+    setError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (form.email.trim().toLowerCase() === 'admin@diu.edu.bd') {
+      setError('This email is reserved. Please use a different email address.');
+      return;
+    }
+    if (form.password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    if (form.password !== form.confirm) {
+      setError('Passwords do not match.');
+      return;
+    }
+    if (!agreed) {
+      setError('Please accept the terms to continue.');
+      return;
+    }
     setLoading(true);
-    setError('');
-    setResult(null);
-
-    const res = await authService.register(email);
-    if (res.success) {
-      setResult(res.data);
+    const result = await register({ name: form.name, email: form.email, password: form.password, studentId: form.studentId });
+    if (result.success) {
+      navigate('/');
     } else {
-      const msg = res.error;
-      if (msg === 'EMAIL_NOT_FOUND')
-        setError('This email is not found in our admitted students database.');
-      else if (msg === 'ACCOUNT_EXISTS')
-        setError('An account already exists for this email. Please login.');
-      else
-        setError(msg || 'Something went wrong. Please try again.');
+      setError(result.error || 'Registration failed. Please try again.');
     }
     setLoading(false);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 md:p-12 overflow-x-hidden relative"
-      style={{ backgroundColor: '#0A1045' }}>
+      style={{ backgroundColor: '#f7f9fb', fontFamily: 'Manrope, sans-serif' }}>
 
       {/* Background blobs */}
-      <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
-        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl opacity-20"
-          style={{ backgroundColor: '#033860' }}></div>
-        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full blur-[100px] opacity-15"
-          style={{ backgroundColor: '#033860' }}></div>
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute rounded-full"
+          style={{ top: '-6rem', left: '-6rem', width: 384, height: 384, backgroundColor: 'rgba(12,18,130,0.05)', filter: 'blur(80px)' }} />
+        <div className="absolute rounded-full"
+          style={{ bottom: 0, right: 0, width: 500, height: 500, backgroundColor: 'rgba(213,227,252,0.1)', filter: 'blur(100px)' }} />
       </div>
 
       <main className="relative z-10 w-full max-w-6xl flex flex-col lg:flex-row gap-16 items-center">
 
-        {/* Left editorial panel */}
+        {/* ── Left editorial panel ──────────────────────────────────── */}
         <div className="hidden lg:flex flex-col flex-1 gap-8">
-          <h1
-            className="font-headline font-black text-6xl tracking-tighter leading-none cursor-pointer text-white"
-            onClick={() => navigate('/')}
-          >
-            Daffodil<br />International<br />University
+          <h1 className="font-black text-6xl tracking-tighter leading-none"
+            style={{ color: '#000155', fontFamily: 'Manrope, sans-serif' }}>
+            Academic <br /> Portal
           </h1>
+
           <div className="space-y-6 max-w-md">
-            <h2 className="text-3xl font-headline font-bold tracking-tight text-white">
-              Access the Digital Campus.
+            <h2 className="text-3xl font-bold tracking-tight" style={{ color: '#191c1e' }}>
+              Access the Digital Archives.
             </h2>
-            <p className="leading-relaxed text-white/50">
-              Only admitted students can create an account. Your gateway to institutional resources, course management, and academic excellence starts here.
+            <p className="text-lg leading-relaxed" style={{ color: '#464652' }}>
+              Join a community of scholars and researchers. Your gateway to institutional resources,
+              course management, and academic excellence starts here.
             </p>
-            <div className="p-6 rounded-xl border-l-4" style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderLeftColor: '#ffffff30' }}>
-              <p className="text-sm italic font-medium text-white/70">
-                "The pursuit of knowledge is the highest form of service to society. Your journey begins with precision and discipline."
+
+            {/* Quote block */}
+            <div className="p-6 rounded-xl" style={{
+              backgroundColor: 'rgba(213,227,252,0.3)',
+              borderLeft: '4px solid #0c1282'
+            }}>
+              <p className="italic font-medium leading-relaxed" style={{ color: '#0d1c2e' }}>
+                "The pursuit of knowledge is the highest form of service to society.
+                Your journey begins with precision and discipline."
               </p>
-              <p className="mt-4 text-xs font-bold uppercase tracking-widest text-white/40">
-                DIU Institutional Registrar
+              <p className="mt-4 text-xs font-bold uppercase tracking-widest" style={{ color: '#0c1282' }}>
+                Institutional Registrar
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center justify-center w-10 h-10 rounded-full font-bold text-sm text-white"
-              style={{ backgroundColor: '#0c1282' }}>
-              35K
+
+          {/* Avatar stack */}
+          <div className="mt-8 flex items-center gap-4">
+            <div className="flex" style={{ marginRight: 4 }}>
+              {['#c7d2fe', '#a5b4fc', '#818cf8'].map((bg, i) => (
+                <div key={i} className="w-10 h-10 rounded-full border-2 border-white flex items-center justify-center text-xs font-bold text-white"
+                  style={{ backgroundColor: bg, marginLeft: i === 0 ? 0 : -12, zIndex: 3 - i }}>
+                  <span className="material-symbols-outlined text-base" style={{ color: '#000155' }}>person</span>
+                </div>
+              ))}
             </div>
-            <p className="text-sm font-medium text-white/50">
-              Over 35,000 active students at DIU this semester.
+            <p className="text-sm font-medium" style={{ color: '#464652' }}>
+              Joined by over 12,000 students this semester.
             </p>
           </div>
         </div>
 
-        {/* Right form panel */}
+        {/* ── Right form card ───────────────────────────────────────── */}
         <div className="w-full max-w-md lg:max-w-lg">
-          <div className="p-8 md:p-12 rounded-xl shadow-2xl" style={{ backgroundColor: '#033860', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="p-8 md:p-12 rounded-xl"
+            style={{
+              backgroundColor: '#ffffff',
+              boxShadow: '0 1px 3px rgba(25,28,30,0.06)',
+              border: '1px solid rgba(198,197,212,0.1)'
+            }}>
 
-            {/* Mobile header */}
-            <div
-              className="lg:hidden mb-8 cursor-pointer"
-              onClick={() => navigate('/')}
-            >
-              <h1 className="font-headline font-black text-3xl tracking-tighter text-white">DIU Portal</h1>
+            {/* Mobile logo */}
+            <div className="lg:hidden mb-8">
+              <h1 className="font-black text-3xl tracking-tighter" style={{ color: '#000155' }}>
+                Academic Portal
+              </h1>
             </div>
 
-            {result ? (
-              /* Success State */
-              <div className="space-y-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                    <span className="material-symbols-outlined text-2xl text-white">mark_email_read</span>
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-headline font-bold text-white">Verification Sent</h3>
-                    <p className="text-sm text-white/60">Welcome, {result.studentName}!</p>
-                  </div>
-                </div>
+            <div className="mb-10">
+              <h3 className="text-2xl font-bold mb-2" style={{ color: '#191c1e' }}>Create Account</h3>
+              <p className="text-sm" style={{ color: '#464652' }}>
+                Please provide your institutional details to continue.
+              </p>
+            </div>
 
-                <div className="p-4 rounded-xl" style={{ backgroundColor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  <p className="text-sm font-medium mb-1 text-white/80">{result.message}</p>
-                  <p className="text-xs text-white/40">In production, you would receive an email. For now, use the link below.</p>
-                </div>
-
-                <div className="p-4 rounded-xl" style={{ backgroundColor: 'rgba(12,18,130,0.4)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  <p className="text-xs font-bold uppercase tracking-widest mb-3 text-white/50">
-                    Demo Mode — Verification Link
-                  </p>
-                  <button
-                    onClick={() => navigate(result.verificationLink)}
-                    className="flex items-center gap-2 text-white font-bold text-sm hover:underline underline-offset-4"
-                  >
-                    <span className="material-symbols-outlined text-base">link</span>
-                    Click to verify & set your password
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => navigate('/login')}
-                  className="w-full py-3 font-semibold rounded-xl transition-colors text-sm text-white/70 hover:text-white"
-                  style={{ border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent' }}
-                >
-                  Back to Login
-                </button>
+            {/* Error */}
+            {error && (
+              <div className="mb-6 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2"
+                style={{ backgroundColor: '#ffdad6', color: '#ba1a1a', border: '1px solid rgba(186,26,26,0.2)' }}>
+                <span className="material-symbols-outlined text-base">error</span>
+                {error}
               </div>
-            ) : (
-              <>
-                <div className="mb-10">
-                  <h3 className="text-2xl font-headline font-bold mb-2 text-white">Create Account</h3>
-                  <p className="text-sm text-white/50">
-                    Enter your institutional EDU email used during admission to get started.
-                  </p>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+
+              {/* Full Name */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 ml-1" style={{ color: '#464652' }}>
+                  Full Name
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-xl"
+                    style={{ color: '#767684' }}>person</span>
+                  <input
+                    type="text"
+                    name="name"
+                    value={form.name}
+                    onChange={handleChange}
+                    placeholder="Dr. Julian Reed"
+                    required
+                    className="w-full pl-12 pr-4 py-3 rounded-lg outline-none transition-all text-sm"
+                    style={{ backgroundColor: '#f2f4f6', border: 'none', color: '#191c1e' }}
+                    onFocus={e => e.currentTarget.style.boxShadow = '0 0 0 2px rgba(12,18,130,0.3)'}
+                    onBlur={e => e.currentTarget.style.boxShadow = 'none'}
+                  />
+                </div>
+              </div>
+
+              {/* University Email */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 ml-1" style={{ color: '#464652' }}>
+                  University Email
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-xl"
+                    style={{ color: '#767684' }}>mail</span>
+                  <input
+                    type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    placeholder="j.reed@diu.edu.bd"
+                    required
+                    className="w-full pl-12 pr-4 py-3 rounded-lg outline-none transition-all text-sm"
+                    style={{ backgroundColor: '#f2f4f6', border: 'none', color: '#191c1e' }}
+                    onFocus={e => e.currentTarget.style.boxShadow = '0 0 0 2px rgba(12,18,130,0.3)'}
+                    onBlur={e => e.currentTarget.style.boxShadow = 'none'}
+                  />
+                </div>
+              </div>
+
+              {/* Student ID */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 ml-1" style={{ color: '#464652' }}>
+                  Student ID / Application ID
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-xl"
+                    style={{ color: '#767684' }}>badge</span>
+                  <input
+                    type="text"
+                    name="studentId"
+                    value={form.studentId}
+                    onChange={handleChange}
+                    placeholder="UID-8829-001"
+                    className="w-full pl-12 pr-4 py-3 rounded-lg outline-none transition-all text-sm"
+                    style={{ backgroundColor: '#f2f4f6', border: 'none', color: '#191c1e' }}
+                    onFocus={e => e.currentTarget.style.boxShadow = '0 0 0 2px rgba(12,18,130,0.3)'}
+                    onBlur={e => e.currentTarget.style.boxShadow = 'none'}
+                  />
+                </div>
+              </div>
+
+              {/* Password + Confirm (2-col grid) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Password */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 ml-1" style={{ color: '#464652' }}>
+                    Password
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-xl"
+                      style={{ color: '#767684' }}>lock</span>
+                    <input
+                      type={showPass ? 'text' : 'password'}
+                      name="password"
+                      value={form.password}
+                      onChange={handleChange}
+                      placeholder="••••••••"
+                      required
+                      className="w-full pl-12 pr-10 py-3 rounded-lg outline-none transition-all text-sm"
+                      style={{ backgroundColor: '#f2f4f6', border: 'none', color: '#191c1e' }}
+                      onFocus={e => e.currentTarget.style.boxShadow = '0 0 0 2px rgba(12,18,130,0.3)'}
+                      onBlur={e => e.currentTarget.style.boxShadow = 'none'}
+                    />
+                    <button type="button" onClick={() => setShowPass(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                      style={{ color: '#767684' }}
+                      onMouseEnter={e => e.currentTarget.style.color = '#000155'}
+                      onMouseLeave={e => e.currentTarget.style.color = '#767684'}>
+                      <span className="material-symbols-outlined text-lg">
+                        {showPass ? 'visibility_off' : 'visibility'}
+                      </span>
+                    </button>
+                  </div>
                 </div>
 
-                {error && (
-                  <div className="mb-6 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2 text-red-300"
-                    style={{ backgroundColor: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
-                    <span className="material-symbols-outlined text-base text-red-400">error</span>
-                    {error}
-                  </div>
-                )}
-
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 ml-1 uppercase tracking-wider text-white/60">
-                      University Email
-                    </label>
-                    <div className="relative">
-                      <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-white/40">mail</span>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => { setEmail(e.target.value); setError(''); }}
-                        placeholder="yourname@diu.edu.bd"
-                        required
-                        className="w-full pl-12 pr-4 py-3 rounded-xl text-white outline-none focus:ring-2 transition-all"
-                        style={{
-                          backgroundColor: 'rgba(255,255,255,0.07)',
-                          border: '1px solid rgba(255,255,255,0.1)',
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-xl flex items-start gap-3"
-                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <span className="material-symbols-outlined text-base mt-0.5 text-white/50">info</span>
-                    <p className="text-xs leading-relaxed text-white/50">
-                      Only students who have completed the admission process at DIU can register. Your email must match our admitted students database.
-                    </p>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-4 font-bold rounded-xl active:scale-[0.98] transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-white"
-                    style={{ backgroundColor: '#0c1282' }}
-                  >
-                    {loading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
-                        Checking...
+                {/* Confirm Password */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 ml-1" style={{ color: '#464652' }}>
+                    Confirm
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-xl"
+                      style={{ color: '#767684' }}>verified_user</span>
+                    <input
+                      type={showConfirm ? 'text' : 'password'}
+                      name="confirm"
+                      value={form.confirm}
+                      onChange={handleChange}
+                      placeholder="••••••••"
+                      required
+                      className="w-full pl-12 pr-10 py-3 rounded-lg outline-none transition-all text-sm"
+                      style={{ backgroundColor: '#f2f4f6', border: 'none', color: '#191c1e' }}
+                      onFocus={e => e.currentTarget.style.boxShadow = '0 0 0 2px rgba(12,18,130,0.3)'}
+                      onBlur={e => e.currentTarget.style.boxShadow = 'none'}
+                    />
+                    <button type="button" onClick={() => setShowConfirm(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                      style={{ color: '#767684' }}
+                      onMouseEnter={e => e.currentTarget.style.color = '#000155'}
+                      onMouseLeave={e => e.currentTarget.style.color = '#767684'}>
+                      <span className="material-symbols-outlined text-lg">
+                        {showConfirm ? 'visibility_off' : 'visibility'}
                       </span>
-                    ) : 'Send Verification Link'}
-                  </button>
-
-                  <div className="text-center">
-                    <p className="text-sm text-white/50">
-                      Already registered?{' '}
-                      <button
-                        type="button"
-                        onClick={() => navigate('/login')}
-                        className="text-white font-bold ml-1 hover:underline decoration-2 underline-offset-4"
-                      >
-                        Sign in to Portal
-                      </button>
-                    </p>
+                    </button>
                   </div>
-                </form>
+                </div>
+              </div>
 
-                <div className="mt-10 flex justify-center">
-                  <span className="inline-flex items-center gap-2 px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full text-white/60"
-                    style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
-                    Institutional Enrollment Open
+              {/* Terms */}
+              <div className="flex items-start gap-3 pt-2">
+                <div className="flex items-center h-5">
+                  <input
+                    type="checkbox"
+                    id="terms"
+                    checked={agreed}
+                    onChange={e => setAgreed(e.target.checked)}
+                    className="w-4 h-4 rounded"
+                    style={{ accentColor: '#0c1282' }}
+                  />
+                </div>
+                <label htmlFor="terms" className="text-xs leading-relaxed" style={{ color: '#464652' }}>
+                  I agree to the{' '}
+                  <button type="button" className="font-bold hover:underline underline-offset-2"
+                    style={{ color: '#000155' }}>
+                    Institutional Terms of Use
+                  </button>{' '}
+                  and acknowledge the{' '}
+                  <button type="button" className="font-bold hover:underline underline-offset-2"
+                    style={{ color: '#000155' }}>
+                    Data Privacy Policy
+                  </button>{' '}
+                  for students.
+                </label>
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-4 pt-4">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-4 font-bold rounded-xl text-lg text-white active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: '#0c1282',
+                    boxShadow: '0 8px 32px rgba(12,18,130,0.2)'
+                  }}>
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                      Creating account...
+                    </span>
+                  ) : 'Create Account'}
+                </button>
+
+                {/* Divider */}
+                <div className="relative flex items-center justify-center py-2">
+                  <div className="w-full border-t" style={{ borderColor: 'rgba(198,197,212,0.3)' }} />
+                  <span className="absolute px-4 text-xs font-bold uppercase tracking-widest"
+                    style={{ backgroundColor: '#ffffff', color: '#767684' }}>
+                    or
                   </span>
                 </div>
-              </>
-            )}
+
+                <div className="text-center">
+                  <p className="text-sm" style={{ color: '#464652' }}>
+                    Already registered?{' '}
+                    <button
+                      type="button"
+                      onClick={() => navigate('/login')}
+                      className="font-bold ml-1 hover:underline underline-offset-4"
+                      style={{ color: '#000155' }}>
+                      Sign in to Portal
+                    </button>
+                  </p>
+                </div>
+              </div>
+            </form>
+
+            {/* Status badge */}
+            <div className="mt-12 flex justify-center">
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest"
+                style={{ backgroundColor: '#d5e3fc', color: '#0d1c2e' }}>
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#000155' }} />
+                Institutional Enrollment Open
+              </span>
+            </div>
           </div>
         </div>
       </main>
 
-      <footer className="fixed bottom-8 left-8 hidden lg:block">
-        <p className="text-[10px] font-medium tracking-widest uppercase text-white/20">
-          © 2024 Daffodil International University — Office of Admissions
+      {/* Footer */}
+      <footer className="fixed bottom-8 left-8 hidden lg:block pointer-events-none">
+        <p className="text-xs font-medium uppercase tracking-widest" style={{ color: '#767684' }}>
+          © 2025 Daffodil International University — Office of Admissions
         </p>
       </footer>
     </div>

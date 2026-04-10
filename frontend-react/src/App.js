@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { seedAdminAccount } from './components/admin/AdminPanel';
 
 // Pages
 import { Dashboard } from './components/dashboard/Dashboard';
@@ -18,7 +19,15 @@ import { SetPasswordPage } from './components/auth/SetPasswordPage';
 
 // Student Pages
 import { CourseRegistrationPage } from './components/student/CourseRegistrationPage';
+import { LateRegistrationPage } from './components/student/LateRegistrationPage';
 import { ProfilePage } from './components/student/ProfilePage';
+
+// Admin & Accounts
+import { AdminPanel } from './components/admin/AdminPanel';
+import { AccountsPanel } from './components/accounts/AccountsPanel';
+
+// Seed admin account on every app load — ensures admin@diu.edu.bd always has role:'admin'
+seedAdminAccount();
 
 function App() {
   return (
@@ -45,10 +54,15 @@ function App() {
 
           {/* Student Routes */}
           <Route path="/course-registration" element={<CourseRegistrationPage />} />
+          <Route path="/late-registration" element={<LateRegistrationPage />} />
           <Route path="/profile" element={<ProfilePage />} />
 
           {/* Admin */}
+          <Route path="/admin" element={<AdminPanel />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
+
+          {/* Accounts */}
+          <Route path="/accounts" element={<AccountsPanel />} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" />} />
