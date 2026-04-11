@@ -3,10 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { toast } from 'react-toastify';
 import { SmartAdvisorFullscreen } from './SmartAdvisorFullscreen';
-
-// ── Smart Advisor backend proxy ───────────────────────────────────────────────
-// Calls the Python backend which proxies to DeepSeek (avoids browser CORS block)
-const SMART_ADVISOR_URL = 'http://localhost:8081/api/v1/ai/smart-advisor';
+import api from '../../services/api';
+import { saveCourseRegistration } from '../../services/studentDataService';
 
 // ── Fee constants ─────────────────────────────────────────────────────────────
 const FEE_PER_CREDIT = 30000 / 11;
@@ -17,7 +15,7 @@ const MIN_CREDITS    = 9;
 
 // ── Semester data (theory = 3 cr, lab = 1.5 cr) ──────────────────────────────
 const isLab = (code) => code.endsWith('L');
-const cr    = (code) => isLab(code) ? 1.5 : 3;
+const cr    = (code) => isLab(code) ? 1 : 3;
 
 const RAW_SEMESTER_DATA = {
   'Semester 1': [
@@ -113,15 +111,10 @@ function calcFees(cart) {
 }
 
 async function callDeepSeek(msgs, sys) {
-  const res = await fetch(SMART_ADVISOR_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages: msgs, systemPrompt: sys, maxTokens: 512 }),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
+  const res = await api.post('/v1/ai/process', { messages: msgs, systemPrompt: sys, maxTokens: 512 });
+  const data = res.data;
   if (!data.success) throw new Error(data.message || 'Backend error');
-  return data.reply;
+  return data.data?.reply || data.data?.response || '';
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -221,6 +214,13 @@ export const CourseRegistrationPage = () => {
         setChatMsgs(p => [...p, { role:'assistant', content:`🎓 All checks passed!\n\n✅ Payment: Confirmed\n✅ Teaching Evaluations: Completed\n✅ Smart Advisor Approval: GRANTED\n\nYou are now enrolled in ${cart.length} course(s). Congratulations!` }]);
         setApproved(true); setStep(4);
         toast.success('Registration complete! Smart Advisor approved.');
+        saveCourseRegistration(user?.email, {
+          semester: selSem,
+          courses: cart.map(c => ({ ...c.course, type: c.type })),
+          totalCredits: fees.totalCr,
+          totalFee: fees.total,
+          status: 'APPROVED',
+        });
       }, 3000);
     }, 1500);
   };
@@ -283,7 +283,7 @@ Respond concisely (<120 words). Be friendly and professional.`;
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold" style={{ background:'#d5e3fc', color:'#0d1c2e' }}>
             <span className="material-symbols-outlined text-sm">event_note</span>
-            FALL SEMESTER 2024
+            SPRING SEMESTER 2026
           </div>
           <button className="p-2 rounded-full relative hover:bg-slate-100 transition-colors" style={{ color:'#464652' }}>
             <span className="material-symbols-outlined">notifications</span>
@@ -361,24 +361,24 @@ Respond concisely (<120 words). Be friendly and professional.`;
       </aside>
 
       {/* ── Main Canvas ──────────────────────────────────────────── */}
-      <main className="pt-16 min-h-screen" style={{ marginLeft:'0', paddingLeft:'0' }}>
-        <div className="lg:ml-64 p-6 lg:p-8">
+      <main className="pt-16 min-h-screen pb-20 lg:pb-0" style={{ marginLeft:'0', paddingLeft:'0' }}>
+        <div className="lg:ml-64 p-4 md:p-6 lg:p-8">
 
           {/* Late Registration Alert */}
-          <div className="mb-8 p-4 rounded-xl flex items-center justify-between border-l-4"
+          <div className="mb-8 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-l-4"
                style={{ background:'#ffdad6', borderLeftColor:'#ba1a1a', color:'#410002' }}>
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined" style={{ color:'#ba1a1a' }}>warning</span>
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined shrink-0" style={{ color:'#ba1a1a' }}>warning</span>
               <div>
                 <span className="font-bold">REGISTRATION NOTICE:</span>
                 <span className="text-sm ml-1">
                   {approved
-                    ? 'Your registration is complete. Courses are confirmed for Fall 2024.'
+                    ? 'Your registration is complete. Courses are confirmed for Spring 2026.'
                     : 'Registration portal closes in 48 hours. Complete your course selection and payment before the deadline.'}
                 </span>
               </div>
             </div>
-            <button className="text-xs font-bold uppercase tracking-widest underline whitespace-nowrap ml-4"
+            <button className="text-xs font-bold uppercase tracking-widest underline whitespace-nowrap self-start sm:self-auto"
                     onClick={() => toast.info('Registration deadline: October 31, 2024')}>
               View Deadlines
             </button>
@@ -386,7 +386,7 @@ Respond concisely (<120 words). Be friendly and professional.`;
 
           {/* Section Header */}
           <div className="mb-10">
-            <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tighter mb-2" style={{ color:'#000155' }}>
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tighter mb-2" style={{ color:'#000155' }}>
               Course Registration
             </h1>
             <p className="text-lg max-w-2xl" style={{ color:'#464652' }}>
@@ -411,9 +411,10 @@ Respond concisely (<120 words). Be friendly and professional.`;
                          : { background:'#e0e3e5', color:'#464652', border:'2px solid #c6c5d4' }}>
                     {step > s.id ? <span className="material-symbols-outlined text-base">check</span> : s.id}
                   </div>
-                  <span className="text-xs font-bold text-center"
+                  <span className="text-[10px] sm:text-xs font-bold text-center hidden xs:block sm:block"
                         style={{ color: step >= s.id ? '#000155' : '#767684' }}>
-                    {s.label}
+                    <span className="hidden sm:inline">{s.label}</span>
+                    <span className="sm:hidden">{s.id}</span>
                   </span>
                 </div>
               ))}
@@ -562,13 +563,13 @@ Respond concisely (<120 words). Be friendly and professional.`;
                 </div>
 
                 {/* Add more courses row */}
-                <div className="p-4 flex justify-center" style={{ background:'#f2f4f6' }}>
+                <div className="p-4 flex flex-wrap justify-center gap-2" style={{ background:'#f2f4f6' }}>
                   {available.filter(c => !cartCodes.includes(c.course_code)).length > 0 ? (
                     available.filter(c => !cartCodes.includes(c.course_code)).slice(0, 4).map(course => (
                       <button key={course.course_code}
                         disabled={step > 1}
                         onClick={() => addCourse(course)}
-                        className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg mr-2 transition-all disabled:opacity-40"
+                        className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg transition-all disabled:opacity-40"
                         style={{ color:'#0c1282', background:'#eff6ff' }}
                         onMouseEnter={e => e.currentTarget.style.background='#dbeafe'}
                         onMouseLeave={e => e.currentTarget.style.background='#eff6ff'}>
@@ -792,7 +793,7 @@ Respond concisely (<120 words). Be friendly and professional.`;
 
       {/* ── Smart Advisor Chat Panel ─────────────────────────────── */}
       {chatOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-1.5rem)]">
+        <div className="fixed bottom-32 lg:bottom-24 right-4 lg:right-6 z-50 w-[92vw] sm:w-96 max-w-[calc(100vw-2rem)]">
           <div className="rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ background:'white', border:'1px solid #e6e8ea', height:'500px' }}>
             {/* header */}
             <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ background:'#0c1282', borderBottom:'1px solid rgba(255,255,255,0.1)' }}>
@@ -883,8 +884,27 @@ Respond concisely (<120 words). Be friendly and professional.`;
         </div>
       )}
 
+      {/* ── Mobile Bottom Nav ─────────────────────────────────────── */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-2 py-2 border-t border-slate-200"
+           style={{ background: 'white', boxShadow: '0 -2px 12px rgba(0,0,0,0.06)' }}>
+        {[
+          { icon: 'home',            label: 'Home',      action: () => navigate('/') },
+          { icon: 'school',          label: 'Courses',   action: () => {}, active: true },
+          { icon: 'pending_actions', label: 'Late Reg',  action: () => navigate('/late-registration') },
+          { icon: 'account_circle',  label: 'Profile',   action: () => navigate('/profile') },
+        ].map(({ icon, label, action, active }) => (
+          <button key={label} onClick={action}
+            className="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-colors"
+            style={{ color: active ? '#0c1282' : '#94a3b8' }}>
+            <span className="material-symbols-outlined text-xl"
+                  style={active ? { fontVariationSettings: "'FILL' 1" } : {}}>{icon}</span>
+            <span className="text-[9px] font-bold uppercase tracking-wide">{label}</span>
+          </button>
+        ))}
+      </nav>
+
       {/* ── Floating Smart Advisor Button ─────────────────────────── */}
-      <div className="fixed bottom-8 right-6 z-50">
+      <div className="fixed bottom-16 lg:bottom-8 right-6 z-50">
         <button onClick={() => setChatOpen(v => !v)}
           className="w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 active:scale-90 relative group"
           style={{ background:'#0c1282', boxShadow:'0 4px 20px rgba(12,18,130,0.4)' }}>

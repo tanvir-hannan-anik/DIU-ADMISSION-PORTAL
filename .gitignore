@@ -10,6 +10,7 @@ backend-python/__pycache__/
 backend-python/**/__pycache__/
 backend-python/*.pyc
 backend-python/.env
+backend-python/venv/
 
 # Department flyer images (large binary files — not tracked in git)
 department details/
@@ -19,3 +20,6 @@ department details/
 .vscode/
 *.DS_Store
 .claude/
+
+# Temp scripts
+*.ps1

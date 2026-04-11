@@ -1,33 +1,37 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { seedAdminAccount } from './components/admin/AdminPanel';
+import { useAuth } from './hooks/useAuth';
 
 // Pages
-import { Dashboard } from './components/dashboard/Dashboard';
-import { PreRegisterPage } from './components/preregister/PreRegisterPage';
-import { OnlineAdmitPage } from './components/admit/OnlineAdmitPage';
-import { AdminDashboard } from './components/admin/AdminDashboard';
-import { PaymentPage } from './components/admission/PaymentPage';
+import { Dashboard }              from './components/dashboard/Dashboard';
+import { PreRegisterPage }        from './components/preregister/PreRegisterPage';
+import { OnlineAdmitPage }        from './components/admit/OnlineAdmitPage';
+import { PaymentPage }            from './components/admission/PaymentPage';
 import { RegistrationConfirmPage } from './components/admission/RegistrationConfirmPage';
-import { StudentIDCardPage } from './components/admission/StudentIDCardPage';
-
-// Auth Pages
-import { LoginPage } from './components/auth/LoginPage';
-import { RegisterPage } from './components/auth/RegisterPage';
-import { SetPasswordPage } from './components/auth/SetPasswordPage';
-
-// Student Pages
+import { StudentIDCardPage }      from './components/admission/StudentIDCardPage';
+import { LoginPage }              from './components/auth/LoginPage';
+import { RegisterPage }           from './components/auth/RegisterPage';
+import { SetPasswordPage }        from './components/auth/SetPasswordPage';
 import { CourseRegistrationPage } from './components/student/CourseRegistrationPage';
-import { LateRegistrationPage } from './components/student/LateRegistrationPage';
-import { ProfilePage } from './components/student/ProfilePage';
+import { LateRegistrationPage }   from './components/student/LateRegistrationPage';
+import { ProfilePage }            from './components/student/ProfilePage';
 
-// Admin & Accounts
-import { AdminPanel } from './components/admin/AdminPanel';
-import { AccountsPanel } from './components/accounts/AccountsPanel';
+// ── Protected route: redirects to /login if not authenticated ─────────────────
+function ProtectedRoute({ children }) {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return children;
+}
 
-// Seed admin account on every app load — ensures admin@diu.edu.bd always has role:'admin'
-seedAdminAccount();
+// ── Guest route: redirects authenticated users away from login/register ───────
+function GuestRoute({ children }) {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return null;
+  if (isAuthenticated) return <Navigate to="/" replace />;
+  return children;
+}
 
 function App() {
   return (
@@ -35,34 +39,25 @@ function App() {
       <div className="min-h-screen bg-background">
         <Routes>
           {/* Public Routes */}
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/"          element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
 
-          {/* Auth Routes */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          {/* Auth Routes (redirect away if already logged in) */}
+          <Route path="/login"        element={<GuestRoute><LoginPage /></GuestRoute>} />
+          <Route path="/register"     element={<GuestRoute><RegisterPage /></GuestRoute>} />
           <Route path="/set-password" element={<SetPasswordPage />} />
 
-          {/* Pre-Register Routes */}
-          <Route path="/pre-register" element={<PreRegisterPage />} />
-
-          {/* Online Admission Flow */}
-          <Route path="/admit-card" element={<OnlineAdmitPage />} />
-          <Route path="/admission/payment" element={<PaymentPage />} />
+          {/* Admission flow (public — anyone can apply) */}
+          <Route path="/pre-register"           element={<PreRegisterPage />} />
+          <Route path="/admit-card"             element={<OnlineAdmitPage />} />
+          <Route path="/admission/payment"      element={<PaymentPage />} />
           <Route path="/admission/confirmation" element={<RegistrationConfirmPage />} />
-          <Route path="/admission/id-card" element={<StudentIDCardPage />} />
+          <Route path="/admission/id-card"      element={<StudentIDCardPage />} />
 
-          {/* Student Routes */}
-          <Route path="/course-registration" element={<CourseRegistrationPage />} />
-          <Route path="/late-registration" element={<LateRegistrationPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-
-          {/* Admin */}
-          <Route path="/admin" element={<AdminPanel />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-
-          {/* Accounts */}
-          <Route path="/accounts" element={<AccountsPanel />} />
+          {/* Protected student routes */}
+          <Route path="/course-registration" element={<ProtectedRoute><CourseRegistrationPage /></ProtectedRoute>} />
+          <Route path="/late-registration"   element={<ProtectedRoute><LateRegistrationPage /></ProtectedRoute>} />
+          <Route path="/profile"             element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" />} />
@@ -75,7 +70,6 @@ function App() {
         hideProgressBar={false}
         newestOnTop={false}
         closeOnClick
-        rtl={false}
         pauseOnFocusLoss
         draggable
         pauseOnHover

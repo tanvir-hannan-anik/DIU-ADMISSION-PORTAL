@@ -8,7 +8,9 @@ export const useAuth = () => {
 
   useEffect(() => {
     const token = authService.getToken();
+    const savedUser = authService.getUser();
     setIsAuthenticated(!!token);
+    setUser(savedUser);
     setLoading(false);
   }, []);
 

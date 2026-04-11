@@ -86,7 +86,7 @@ public class AuthService {
     }
 
     /**
-     * Step 4: Login.
+     * Step 4: Login — works for admitted students and self-registered users.
      */
     public Map<String, Object> login(String email, String rawPassword) {
         User user = userRepository.findByEmail(email)
@@ -102,17 +102,51 @@ public class AuthService {
 
         String token = jwtUtil.generateToken(email);
 
-        AdmittedStudent student = admittedStudentRepository.findById(user.getAdmittedStudentId())
-                .orElseThrow(() -> new RuntimeException("STUDENT_NOT_FOUND"));
+        java.util.Map<String, Object> userInfo = new java.util.HashMap<>();
+        userInfo.put("email", user.getEmail());
+        userInfo.put("role", user.getRole() != null ? user.getRole() : "student");
+
+        if (user.getAdmittedStudentId() != null) {
+            admittedStudentRepository.findById(user.getAdmittedStudentId()).ifPresent(student -> {
+                userInfo.put("name", student.getName());
+                userInfo.put("studentId", student.getStudentId());
+                userInfo.put("department", student.getDepartment());
+                userInfo.put("semester", student.getSemester());
+            });
+        }
+
+        if (!userInfo.containsKey("name")) {
+            userInfo.put("name", user.getName() != null ? user.getName() : email.split("@")[0]);
+        }
+
+        return Map.of("token", token, "user", userInfo);
+    }
+
+    /**
+     * Self-register: anyone can create an account (no admission check).
+     */
+    public Map<String, Object> selfRegister(String name, String email, String rawPassword) {
+        if (userRepository.existsByEmail(email)) {
+            throw new RuntimeException("ACCOUNT_EXISTS");
+        }
+
+        User user = User.builder()
+                .email(email)
+                .name(name)
+                .password(passwordEncoder.encode(rawPassword))
+                .verified(true)
+                .role("student")
+                .build();
+        userRepository.save(user);
+
+        String token = jwtUtil.generateToken(email);
 
         return Map.of(
                 "token", token,
                 "user", Map.of(
-                        "email", user.getEmail(),
-                        "name", student.getName(),
-                        "studentId", student.getStudentId(),
-                        "department", student.getDepartment(),
-                        "semester", student.getSemester()
+                        "email", email,
+                        "name", name,
+                        "role", "student"
                 )
         );
     }

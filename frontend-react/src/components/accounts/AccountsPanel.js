@@ -7,7 +7,7 @@ function getAdminConfig() {
     const s = localStorage.getItem('diu_admin_config');
     if (s) return JSON.parse(s);
   } catch {}
-  return { lateFee: 5000, currentSemester: 'Spring 2025' };
+  return { lateFee: 5000, currentSemester: 'Spring 2026' };
 }
 
 export const AccountsPanel = () => {

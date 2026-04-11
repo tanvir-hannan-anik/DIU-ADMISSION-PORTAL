@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'; // Online Admission Portal
 import { Navigation } from '../common/Navigation';
 import { Footer } from '../common/Footer';
 import { toast } from 'react-toastify';
+import API_CONFIG from '../../config/apiConfig';
 
 // ── Constants ──────────────────────────────────────────────────────
 const DIVISIONS = ['Dhaka', 'Chittagong', 'Rajshahi', 'Sylhet', 'Barisal', 'Khulna', 'Rangpur', 'Mymensingh'];
@@ -209,19 +210,62 @@ export const OnlineAdmitPage = () => {
     return true;
   };
 
-  const handleFullFormSubmit = () => {
+  const handleFullFormSubmit = async () => {
     if (!validate4()) return;
     setSubmitting(true);
-    setTimeout(() => {
+    try {
+      // Build backend payload
+      const payload = {
+        fullName:      personal.fullName,
+        email:         personal.email || savedDraft.email || '',
+        dateOfBirth:   personal.dob,
+        contactNumber: personal.phone,
+        program:       program.programName,
+        major:         program.major || '',
+        sscResult:     academic.sscGpa,
+        sscGroup:      academic.sscGroup,
+        sscBoard:      academic.sscBoard,
+        sscYear:       academic.sscYear,
+        sscMarksheet:  uploadedDocs['ssc_marksheet'] ? 'uploaded' : '',
+        hscResult:     academic.hscGpa,
+        hscGroup:      academic.hscGroup,
+        hscBoard:      academic.hscBoard,
+        hscYear:       academic.hscYear,
+        hscMarksheet:  uploadedDocs['hsc_marksheet'] ? 'uploaded' : '',
+        essayOne:      program.essayOne || '',
+        essayTwo:      program.essayTwo || '',
+      };
+
+      let backendAppId = null;
+      try {
+        const res = await fetch(`${API_CONFIG.BASE_URL}/v1/admission/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data?.data?.appId) {
+          backendAppId = data.data.appId;
+          localStorage.setItem('applicationId', backendAppId);
+          if (data.data.admissionDate) localStorage.setItem('admissionDate', data.data.admissionDate);
+          if (data.data.vivaDate)      localStorage.setItem('vivaDate',      data.data.vivaDate);
+        }
+      } catch {
+        // Backend unavailable — continue with local ID
+      }
+
       const formData = { personal, address, academic, program, uploadedDocs };
       localStorage.setItem('fullFormData', JSON.stringify(formData));
       localStorage.setItem('fullFormSubmitted', 'yes');
       localStorage.setItem('bloodGroup', personal.bloodGroup);
       localStorage.setItem('profilePhoto', profilePhoto);
-      setSubmitting(false);
-      toast.success('Registration form submitted! Proceeding to payment…');
+      toast.success('Application submitted! Proceeding to payment…');
       setTimeout(() => navigate('/admission/payment'), 800);
-    }, 1500);
+    } catch (err) {
+      toast.error('Submission failed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Load chatbot-collected data if available

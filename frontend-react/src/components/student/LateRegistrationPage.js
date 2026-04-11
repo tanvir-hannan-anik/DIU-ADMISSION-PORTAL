@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { toast } from 'react-toastify';
 import { SmartAdvisorFullscreen } from './SmartAdvisorFullscreen';
-
-const SMART_ADVISOR_URL = 'http://localhost:8081/api/v1/ai/smart-advisor';
+import api from '../../services/api';
+import { saveLateRegistration } from '../../services/studentDataService';
 const FEE_PER_CREDIT    = 30000 / 11;
 const RETAKE_FEE        = 3000;
 const DROP_FEE          = 1000;
@@ -12,7 +12,7 @@ const MAX_CREDITS       = 18;
 const MIN_CREDITS       = 9;
 
 const isLab = (code) => code.endsWith('L');
-const cr    = (code) => isLab(code) ? 1.5 : 3;
+const cr    = (code) => isLab(code) ? 1 : 3;
 
 const DEFAULT_SEMESTERS = {
   'Semester 1': [
@@ -93,7 +93,7 @@ function getAdminConfig() {
     const s = localStorage.getItem('diu_admin_config');
     if (s) return JSON.parse(s);
   } catch {}
-  return { lateFee: 5000, lateRegistrationEnabled: true, currentSemester: 'Fall 2025', lateRegistrationEnd: '' };
+  return { lateFee: 5000, lateRegistrationEnabled: true, currentSemester: 'Spring 2026', lateRegistrationEnd: '' };
 }
 
 function calcFees(cart, lateFee) {
@@ -115,15 +115,10 @@ function calcFees(cart, lateFee) {
 }
 
 async function callAdvisor(msgs, sys) {
-  const res = await fetch(SMART_ADVISOR_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages: msgs, systemPrompt: sys, maxTokens: 512 }),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
+  const res = await api.post('/v1/ai/process', { messages: msgs, systemPrompt: sys, maxTokens: 512 });
+  const data = res.data;
   if (!data.success) throw new Error(data.message || 'Backend error');
-  return data.reply;
+  return data.data?.reply || data.data?.response || '';
 }
 
 function useCountdown(target) {
@@ -168,7 +163,7 @@ export const LateRegistrationPage = () => {
   const adminConfig = getAdminConfig();
   const LATE_FEE    = adminConfig.lateFee || 5000;
   const SEMESTER_DATA = getSemesterData();
-  const countdown   = useCountdown(adminConfig.lateRegistrationEnd || '2025-06-01T23:59:59');
+  const countdown   = useCountdown(adminConfig.lateRegistrationEnd || '2026-04-30T23:59:59');
 
   // course state
   const [selSem,   setSelSem]   = useState('Semester 5');
@@ -186,6 +181,51 @@ export const LateRegistrationPage = () => {
   const [autoLabel, setAutoLabel] = useState('');
   const [payLoading,setPayLoading]= useState(false);
   const [requestId] = useState(() => `LR-${Date.now().toString(36).toUpperCase()}`);
+
+  // evidence upload
+  const [evidenceFiles, setEvidenceFiles] = useState([]);  // [{name, size, type, dataUrl}]
+  const [dragOver,      setDragOver]      = useState(false);
+  const [evidenceErr,   setEvidenceErr]   = useState('');
+  const fileInputRef = useRef(null);
+
+  const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+  const MAX_FILES     = 5;
+
+  const processFiles = useCallback((files) => {
+    setEvidenceErr('');
+    const incoming = Array.from(files);
+    const valid = [];
+    for (const f of incoming) {
+      if (!ALLOWED_TYPES.includes(f.type)) { setEvidenceErr(`"${f.name}" is not allowed. Use PDF or image.`); continue; }
+      if (f.size > MAX_FILE_SIZE)           { setEvidenceErr(`"${f.name}" exceeds 5 MB limit.`); continue; }
+      if (evidenceFiles.length + valid.length >= MAX_FILES) { setEvidenceErr(`Max ${MAX_FILES} files allowed.`); break; }
+      valid.push(f);
+    }
+    valid.forEach(f => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setEvidenceFiles(prev => {
+          if (prev.find(x => x.name === f.name && x.size === f.size)) return prev;
+          return [...prev, { name: f.name, size: f.size, type: f.type, dataUrl: e.target.result }];
+        });
+      };
+      reader.readAsDataURL(f);
+    });
+  }, [evidenceFiles]);
+
+  const handleFileDrop = (e) => {
+    e.preventDefault(); setDragOver(false);
+    processFiles(e.dataTransfer.files);
+  };
+  const handleFileInput = (e) => { processFiles(e.target.files); e.target.value = ''; };
+  const removeFile = (name) => setEvidenceFiles(prev => prev.filter(f => f.name !== name));
+
+  const formatSize = (bytes) => bytes < 1024 * 1024
+    ? `${(bytes / 1024).toFixed(1)} KB`
+    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+  const fileIcon = (type) => type === 'application/pdf' ? 'picture_as_pdf' : 'image';
 
   // approval states
   const [deptSt,      setDeptSt]      = useState('pending');  // pending|approved
@@ -258,8 +298,16 @@ export const LateRegistrationPage = () => {
     localStorage.setItem('diu_late_requests', JSON.stringify([...reqs, {
       id: requestId, studentEmail: user?.email, studentName: user?.name,
       semester: selSem, courses: cart, reason: reason.trim(),
+      evidenceFiles: evidenceFiles.map(f => ({ name: f.name, size: f.size, type: f.type })),
       status: 'dept_pending', fees, createdAt: new Date().toISOString(),
     }]));
+    saveLateRegistration(user?.email, {
+      semester: selSem,
+      courses: cart.map(c => ({ ...c.course, type: c.type })),
+      reason: reason.trim(),
+      evidenceCount: evidenceFiles.length,
+      status: 'SUBMITTED',
+    });
 
     setStep(3); setAutoLabel('Forwarded to Department Head...');
     toast.success('Request submitted! Routing to Department Head.');
@@ -365,7 +413,7 @@ Be concise (<120 words). Guide the student through the late registration process
           <p className="text-base mt-2" style={{ color:'#464652' }}>Late registration fully approved.</p>
         </div>
         <div className="rounded-xl p-6 text-left space-y-3" style={{ background:'white', border:'1px solid #e6e8ea' }}>
-          {[['Request ID', requestId],['Semester', selSem],['Courses', `${cart.length}`],['Credits', fees.totalCr],['Total Paid', `৳${fees.total.toLocaleString()}`]].map(([k,v]) => (
+          {[['Request ID', requestId],['Semester', selSem],['Courses', `${cart.length}`],['Credits', fees.totalCr],['Evidence', `${evidenceFiles.length} file(s)`],['Total Paid', `৳${fees.total.toLocaleString()}`]].map(([k,v]) => (
             <div key={k} className="flex justify-between text-sm">
               <span style={{ color:'#464652' }}>{k}</span>
               <span className="font-bold" style={{ color:'#000155' }}>{v}</span>
@@ -478,8 +526,8 @@ Be concise (<120 words). Guide the student through the late registration process
       </aside>
 
       {/* ── Main ────────────────────────────────────────────────────────────── */}
-      <main className="pt-16 min-h-screen">
-        <div className="lg:ml-64 p-6 lg:p-8">
+      <main className="pt-16 min-h-screen pb-20 lg:pb-0">
+        <div className="lg:ml-64 p-4 md:p-6 lg:p-8">
 
           {/* Late reg banner */}
           <div className="mb-8 p-4 rounded-xl flex items-center justify-between border-l-4 flex-wrap gap-3"
@@ -504,7 +552,7 @@ Be concise (<120 words). Guide the student through the late registration process
 
           {/* Page header */}
           <div className="mb-10">
-            <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tighter mb-2" style={{ color:'#000155' }}>
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tighter mb-2" style={{ color:'#000155' }}>
               Late Course Registration
             </h1>
             <p className="text-lg max-w-2xl" style={{ color:'#464652' }}>
@@ -712,14 +760,74 @@ Be concise (<120 words). Guide the student through the late registration process
                       {reasonErr && <p className="text-xs flex items-center gap-1" style={{ color:'#ba1a1a' }}><span className="material-symbols-outlined text-xs">error</span>{reasonErr}</p>}
                       <p className="text-[10px]" style={{ color:'#767684' }}>{reason.length} chars (min 20)</p>
                     </div>
-                    <div className="flex flex-col gap-4">
-                      <label className="block text-xs font-bold uppercase tracking-widest" style={{ color:'#464652' }}>Evidence Upload</label>
-                      <div className="flex-1 border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-2 p-6 cursor-pointer transition-colors hover:bg-slate-50"
-                        style={{ borderColor:'rgba(198,197,212,0.6)' }}>
-                        <span className="material-symbols-outlined text-4xl" style={{ color:'#464652' }}>upload_file</span>
-                        <p className="text-xs font-bold" style={{ color:'#464652' }}>Drop PDF or click to browse</p>
-                        <p className="text-[10px] italic" style={{ color:'#767684' }}>(Medical, travel, or admin proofs)</p>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold uppercase tracking-widest" style={{ color:'#464652' }}>
+                          Evidence Upload
+                          <span className="ml-1 font-normal normal-case" style={{ color:'#767684' }}>(optional)</span>
+                        </label>
+                        <span className="text-[10px]" style={{ color:'#767684' }}>{evidenceFiles.length}/{MAX_FILES} files</span>
                       </div>
+
+                      {/* Drop zone */}
+                      <input ref={fileInputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp"
+                        className="hidden" onChange={handleFileInput} />
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                        onDragLeave={() => setDragOver(false)}
+                        onDrop={handleFileDrop}
+                        className="border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-2 p-5 cursor-pointer transition-all"
+                        style={{
+                          borderColor: dragOver ? '#ba1a1a' : 'rgba(198,197,212,0.6)',
+                          background: dragOver ? '#ffdad6' : '#f7f9fb',
+                        }}>
+                        <span className="material-symbols-outlined text-3xl" style={{ color: dragOver ? '#ba1a1a' : '#464652' }}>upload_file</span>
+                        <p className="text-xs font-bold text-center" style={{ color:'#464652' }}>
+                          {dragOver ? 'Drop files here' : 'Click to browse or drag & drop'}
+                        </p>
+                        <p className="text-[10px] text-center" style={{ color:'#767684' }}>PDF, JPG, PNG · max 5 MB each · up to {MAX_FILES} files</p>
+                        <p className="text-[10px] italic text-center" style={{ color:'#767684' }}>(Medical, travel, or admin proofs)</p>
+                      </div>
+
+                      {/* Error */}
+                      {evidenceErr && (
+                        <p className="text-xs flex items-center gap-1" style={{ color:'#ba1a1a' }}>
+                          <span className="material-symbols-outlined text-sm">error</span>{evidenceErr}
+                        </p>
+                      )}
+
+                      {/* File list */}
+                      {evidenceFiles.length > 0 && (
+                        <div className="space-y-2">
+                          {evidenceFiles.map(f => (
+                            <div key={f.name} className="flex items-center gap-3 px-3 py-2 rounded-lg"
+                              style={{ background:'white', border:'1px solid #e6e8ea' }}>
+                              <span className="material-symbols-outlined text-lg shrink-0"
+                                style={{ color: f.type === 'application/pdf' ? '#ba1a1a' : '#0c1282', fontVariationSettings:"'FILL' 1" }}>
+                                {fileIcon(f.type)}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-bold truncate" style={{ color:'#191c1e' }}>{f.name}</p>
+                                <p className="text-[10px]" style={{ color:'#767684' }}>{formatSize(f.size)}</p>
+                              </div>
+                              {/* Preview for images */}
+                              {f.type.startsWith('image/') && (
+                                <img src={f.dataUrl} alt={f.name}
+                                  className="w-8 h-8 rounded object-cover shrink-0 border" style={{ borderColor:'#e6e8ea' }} />
+                              )}
+                              <button onClick={() => removeFile(f.name)}
+                                className="shrink-0 transition-colors"
+                                style={{ color:'#767684' }}
+                                onMouseEnter={e => e.currentTarget.style.color='#ba1a1a'}
+                                onMouseLeave={e => e.currentTarget.style.color='#767684'}>
+                                <span className="material-symbols-outlined text-lg">close</span>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
                       <button onClick={handleSubmit}
                         disabled={!cart.length || fees.totalCr < MIN_CREDITS}
                         className="w-full py-4 rounded-xl font-bold text-white transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -990,7 +1098,7 @@ Be concise (<120 words). Guide the student through the late registration process
 
       {/* ── Smart Advisor Chat Panel (floating, no layout space) ─────────────── */}
       {chatOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-1.5rem)]">
+        <div className="fixed bottom-32 lg:bottom-24 right-4 lg:right-6 z-50 w-[92vw] sm:w-96 max-w-[calc(100vw-2rem)]">
           <div className="rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ background:'white', border:'1px solid #e6e8ea', height:'500px' }}>
             <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ background:'#0c1282', borderBottom:'1px solid rgba(255,255,255,0.1)' }}>
               <div className="flex items-center gap-3">
@@ -1077,8 +1185,27 @@ Be concise (<120 words). Guide the student through the late registration process
         </div>
       )}
 
+      {/* ── Mobile Bottom Nav ────────────────────────────────────────────────── */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-2 py-2 border-t border-slate-200"
+           style={{ background: 'white', boxShadow: '0 -2px 12px rgba(0,0,0,0.06)' }}>
+        {[
+          { icon: 'home',            label: 'Home',      action: () => navigate('/') },
+          { icon: 'school',          label: 'Courses',   action: () => navigate('/course-registration') },
+          { icon: 'pending_actions', label: 'Late Reg',  action: () => {}, active: true },
+          { icon: 'account_circle',  label: 'Profile',   action: () => navigate('/profile') },
+        ].map(({ icon, label, action, active }) => (
+          <button key={label} onClick={action}
+            className="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-colors"
+            style={{ color: active ? '#ba1a1a' : '#94a3b8' }}>
+            <span className="material-symbols-outlined text-xl"
+                  style={active ? { fontVariationSettings: "'FILL' 1" } : {}}>{icon}</span>
+            <span className="text-[9px] font-bold uppercase tracking-wide">{label}</span>
+          </button>
+        ))}
+      </nav>
+
       {/* ── Floating Smart Advisor Button ────────────────────────────────────── */}
-      <div className="fixed bottom-8 right-6 z-50">
+      <div className="fixed bottom-16 lg:bottom-8 right-6 z-50">
         <button onClick={() => setChatOpen(v => !v)}
           className="w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 active:scale-90 relative group"
           style={{ background:'#0c1282', boxShadow:'0 4px 20px rgba(12,18,130,0.4)' }}>

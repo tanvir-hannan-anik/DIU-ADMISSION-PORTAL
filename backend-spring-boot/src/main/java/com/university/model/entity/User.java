@@ -22,8 +22,15 @@ public class User {
     @Column(name = "email", nullable = false, unique = true)
     private String email;
 
+    @Column(name = "name")
+    private String name;
+
     @Column(name = "password")
     private String password;
+
+    @Column(name = "role")
+    @Builder.Default
+    private String role = "student";
 
     @Column(name = "admitted_student_id")
     private Long admittedStudentId;

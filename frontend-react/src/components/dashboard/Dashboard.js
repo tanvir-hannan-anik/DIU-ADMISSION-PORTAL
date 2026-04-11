@@ -5,6 +5,7 @@ import { Footer } from '../common/Footer';
 import { useAI } from '../../hooks/useAI';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'react-toastify';
+import { admissionService } from '../../services/admissionService';
 
 // ── Form Assistant Field Definitions ─────────────────────────────────────────
 
@@ -73,7 +74,7 @@ const HeroSection = () => {
   ];
 
   return (
-    <section className="relative h-[870px] flex items-center overflow-hidden bg-primary pt-20">
+    <section className="relative min-h-[600px] md:h-[870px] flex items-center overflow-hidden bg-primary pt-16 md:pt-20 pb-16 md:pb-0">
       <div className="absolute inset-0 z-0">
         <img
           className="w-full h-full object-cover opacity-30"
@@ -83,13 +84,13 @@ const HeroSection = () => {
         <div className="absolute inset-0 bg-gradient-to-r from-primary via-primary/80 to-transparent"></div>
       </div>
 
-      <div className="container mx-auto px-8 relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+      <div className="container mx-auto px-4 md:px-8 relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
         <div className="max-w-2xl">
           <span className="inline-block px-4 py-1.5 rounded-full bg-primary-fixed/20 text-primary-fixed text-xs font-bold uppercase tracking-widest mb-6">
-            Fall 2024 Admissions Open
+            Spring 2026 Admissions Open
           </span>
 
-          <h1 className="font-headline text-5xl md:text-7xl font-extrabold text-white leading-tight mb-6 tracking-tighter">
+          <h1 className="font-headline text-3xl sm:text-5xl md:text-7xl font-extrabold text-white leading-tight mb-6 tracking-tighter">
             Empowering Your <br />
             <span className="text-primary-fixed">Academic Journey</span>
           </h1>
@@ -204,7 +205,7 @@ const QuickAccessCards = () => {
       key={card.id}
       className={`group p-8 rounded-xl ${
         card.darkText ? 'text-white bg-primary' : 'text-on-surface bg-surface-container-low'
-      } hover:${card.darkText ? 'shadow-2xl shadow-primary/20' : 'bg-surface-container'} transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[280px]`}
+      } hover:${card.darkText ? 'shadow-2xl shadow-primary/20' : 'bg-surface-container'} transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[220px] md:min-h-[280px]`}
     >
       <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all">
         <span
@@ -247,7 +248,7 @@ const QuickAccessCards = () => {
   );
 
   return (
-    <section className="py-24 bg-surface px-8">
+    <section className="py-14 md:py-24 bg-surface px-4 md:px-8">
       <div className="max-w-screen-2xl mx-auto">
 
         {/* Student Portal & Course Registration — only for logged-in students */}
@@ -291,32 +292,58 @@ const QuickAccessCards = () => {
   );
 };
 
+// Static fallback department data (shown when backend has no applications yet)
+const STATIC_DEPARTMENTS = [
+  { name: 'Computer Science & Engineering', short: 'CSE', visits: 4832, trend: '+12%', color: 'bg-blue-500', trendColor: 'text-blue-600' },
+  { name: 'Computer & Information Systems', short: 'CIS', visits: 4105, trend: '+19%', color: 'bg-cyan-500', trendColor: 'text-cyan-600' },
+  { name: 'Business Administration', short: 'BBA', visits: 3621, trend: '+8%', color: 'bg-indigo-500', trendColor: 'text-indigo-600' },
+  { name: 'Electrical & Electronic Eng.', short: 'EEE', visits: 2847, trend: '+15%', color: 'bg-violet-500', trendColor: 'text-violet-600' },
+  { name: 'Software Engineering', short: 'SWE', visits: 2234, trend: '+22%', color: 'bg-purple-500', trendColor: 'text-purple-600' },
+  { name: 'Civil Engineering', short: 'CE', visits: 1876, trend: '+5%', color: 'bg-sky-500', trendColor: 'text-sky-600' },
+  { name: 'Law & Justice', short: 'LAW', visits: 1423, trend: '+3%', color: 'bg-teal-500', trendColor: 'text-teal-600' },
+  { name: 'English Language & Literature', short: 'ENG', visits: 1187, trend: '+7%', color: 'bg-emerald-500', trendColor: 'text-emerald-600' },
+  { name: 'Architecture', short: 'ARCH', visits: 987, trend: '+11%', color: 'bg-green-500', trendColor: 'text-green-600' },
+  { name: 'Pharmacy', short: 'PHM', visits: 834, trend: '+9%', color: 'bg-amber-500', trendColor: 'text-amber-600' },
+  { name: 'Textile Engineering', short: 'TE', visits: 712, trend: '+4%', color: 'bg-orange-500', trendColor: 'text-orange-600' },
+];
+
+const DEPT_COLORS = ['bg-blue-500','bg-cyan-500','bg-indigo-500','bg-violet-500','bg-purple-500','bg-sky-500','bg-teal-500','bg-emerald-500','bg-green-500','bg-amber-500','bg-orange-500'];
+const TREND_COLORS = ['text-blue-600','text-cyan-600','text-indigo-600','text-violet-600','text-purple-600','text-sky-600','text-teal-600','text-emerald-600','text-green-600','text-amber-600','text-orange-600'];
+
 // Department Breakdown Component
 const DepartmentBreakdown = () => {
   const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [departments, setDepartments]   = useState(STATIC_DEPARTMENTS);
+  const [totalApplications, setTotalApplications] = useState(null); // null = using static data
 
-  const departments = [
-    { name: 'Computer Science & Engineering', short: 'CSE', visits: 4832, trend: '+12%', color: 'bg-blue-500', trendColor: 'text-blue-600' },
-    { name: 'Computer & Information Systems', short: 'CIS', visits: 4105, trend: '+19%', color: 'bg-cyan-500', trendColor: 'text-cyan-600' },
-    { name: 'Business Administration', short: 'BBA', visits: 3621, trend: '+8%', color: 'bg-indigo-500', trendColor: 'text-indigo-600' },
-    { name: 'Electrical & Electronic Eng.', short: 'EEE', visits: 2847, trend: '+15%', color: 'bg-violet-500', trendColor: 'text-violet-600' },
-    { name: 'Software Engineering', short: 'SWE', visits: 2234, trend: '+22%', color: 'bg-purple-500', trendColor: 'text-purple-600' },
-    { name: 'Civil Engineering', short: 'CE', visits: 1876, trend: '+5%', color: 'bg-sky-500', trendColor: 'text-sky-600' },
-    { name: 'Law & Justice', short: 'LAW', visits: 1423, trend: '+3%', color: 'bg-teal-500', trendColor: 'text-teal-600' },
-    { name: 'English Language & Literature', short: 'ENG', visits: 1187, trend: '+7%', color: 'bg-emerald-500', trendColor: 'text-emerald-600' },
-    { name: 'Architecture', short: 'ARCH', visits: 987, trend: '+11%', color: 'bg-green-500', trendColor: 'text-green-600' },
-    { name: 'Pharmacy', short: 'PHM', visits: 834, trend: '+9%', color: 'bg-amber-500', trendColor: 'text-amber-600' },
-    { name: 'Textile Engineering', short: 'TE', visits: 712, trend: '+4%', color: 'bg-orange-500', trendColor: 'text-orange-600' },
-  ];
+  useEffect(() => {
+    admissionService.getStats().then(res => {
+      if (res.success && res.data?.departmentBreakdown) {
+        const breakdown = res.data.departmentBreakdown;
+        const entries = Object.entries(breakdown).sort((a, b) => b[1] - a[1]);
+        if (entries.length > 0) {
+          setDepartments(entries.map(([name, count], i) => ({
+            name,
+            short: name.length > 10 ? name.slice(0, 3).toUpperCase() : name,
+            visits: count,
+            trend: '',
+            color: DEPT_COLORS[i % DEPT_COLORS.length],
+            trendColor: TREND_COLORS[i % TREND_COLORS.length],
+          })));
+          setTotalApplications(res.data.total || 0);
+        }
+      }
+    }).catch(() => {});
+  }, []);
 
-  const maxVisits = departments[0].visits;
+  const maxVisits = departments.length > 0 ? Math.max(...departments.map(d => d.visits)) : 1;
   const totalVisits = departments.reduce((sum, d) => sum + d.visits, 0);
 
   return (
-    <section className="py-24 bg-surface-container-low px-8">
+    <section className="py-14 md:py-24 bg-surface-container-low px-4 md:px-8">
       <div className="max-w-screen-2xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
+        <div className="flex flex-col md:flex-row justify-between items-end mb-8 md:mb-12 gap-6">
           <div>
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-widest mb-3">
               Live Insights
@@ -346,7 +373,7 @@ const DepartmentBreakdown = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Bar Chart — left 2/3 */}
-          <div className="lg:col-span-2 bg-white rounded-2xl p-8 shadow-sm border border-outline-variant/20">
+          <div className="lg:col-span-2 bg-white rounded-2xl p-4 md:p-8 shadow-sm border border-outline-variant/20">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-bold text-on-surface font-headline">Student Interest by Department</h3>
               <div className="flex items-center gap-1.5 text-xs text-outline">
@@ -365,8 +392,9 @@ const DepartmentBreakdown = () => {
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-black text-outline w-5 text-right">{index + 1}</span>
-                      <span className={`text-sm font-semibold transition-colors ${hoveredIndex === index ? 'text-primary' : 'text-on-surface'}`}>
-                        {dept.name}
+                      <span className={`text-xs sm:text-sm font-semibold transition-colors truncate max-w-[120px] sm:max-w-none ${hoveredIndex === index ? 'text-primary' : 'text-on-surface'}`}>
+                        <span className="sm:hidden">{dept.short}</span>
+                        <span className="hidden sm:inline">{dept.name}</span>
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
@@ -389,7 +417,7 @@ const DepartmentBreakdown = () => {
               ))}
             </div>
             <div className="mt-6 pt-5 border-t border-outline-variant/20 flex items-center justify-between text-xs text-outline">
-              <span>Source: DIU Admission Portal Analytics · Fall 2024</span>
+              <span>Source: DIU Admission Portal · Spring 2026{totalApplications !== null ? ` · ${totalApplications} applications` : ' · Illustrative data'}</span>
               <span className="font-semibold">Total: {totalVisits.toLocaleString()} visits</span>
             </div>
           </div>
@@ -491,8 +519,8 @@ const AdmissionSteps = () => {
   ];
 
   return (
-    <section className="py-24 bg-surface-container-low px-8">
-      <div className="max-w-screen-2xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+    <section className="py-14 md:py-24 bg-surface-container-low px-4 md:px-8">
+      <div className="max-w-screen-2xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-12 items-center">
         <div className="lg:col-span-5 relative">
           <div className="rounded-2xl overflow-hidden shadow-2xl shadow-[#0c1282]/20">
             <img
@@ -1067,9 +1095,9 @@ const ChatbotWidget = () => {
   }
 
   return (
-    <div className="fixed bottom-8 right-8 z-[60] flex flex-col items-end gap-4">
+    <div className="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-[60] flex flex-col items-end gap-4">
       {isOpen && (
-        <div className="bg-white rounded-2xl shadow-2xl w-96 border border-outline-variant/20 flex flex-col h-[520px]">
+        <div className="bg-white rounded-2xl shadow-2xl w-[calc(100vw-2rem)] sm:w-96 border border-outline-variant/20 flex flex-col h-[480px] sm:h-[520px]">
           {/* Widget Header */}
           <div className="bg-primary text-white px-4 py-3 rounded-t-2xl flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">

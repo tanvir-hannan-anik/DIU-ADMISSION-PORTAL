@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
-const ADMIN_EMAIL = 'admin@diu.edu.bd';
-const ADMIN_PASSWORD = 'admin123';
+const ADMIN_EMAIL    = 'admin@diu.edu.bd';
+// Password is read from env at build time; falls back to a strong default.
+// To change: set REACT_APP_ADMIN_PASSWORD in your .env file.
+const ADMIN_PASSWORD = process.env.REACT_APP_ADMIN_PASSWORD || 'DIU@Admin#2026';
 
 // Always ensure the admin account exists with correct credentials and role.
-// If someone registered with admin@diu.edu.bd as a student, this fixes it.
 export function seedAdminAccount() {
   try {
     const users = JSON.parse(localStorage.getItem('diu_users') || '[]');
@@ -14,14 +15,13 @@ export function seedAdminAccount() {
     if (idx === -1) {
       users.push({
         id: 'admin-seed',
-        name: 'Admin',
+        name: 'DIU Admin',
         email: ADMIN_EMAIL,
         password: ADMIN_PASSWORD,
         role: 'admin',
         createdAt: new Date().toISOString(),
       });
     } else {
-      // Enforce correct password and role regardless of how the account was created
       users[idx] = { ...users[idx], password: ADMIN_PASSWORD, role: 'admin' };
     }
     localStorage.setItem('diu_users', JSON.stringify(users));
@@ -34,11 +34,11 @@ function getAdminConfig() {
     if (s) return JSON.parse(s);
   } catch {}
   return {
-    currentSemester:        'Spring 2025',
-    registrationStart:      '2025-01-05',
-    registrationDeadline:   '2025-01-20',
+    currentSemester:        'Spring 2026',
+    registrationStart:      '2026-01-05',
+    registrationDeadline:   '2026-01-20',
     lateRegistrationEnabled: true,
-    lateRegistrationEnd:    '2025-02-05',
+    lateRegistrationEnd:    '2026-04-30',
     lateFee:                5000,
   };
 }

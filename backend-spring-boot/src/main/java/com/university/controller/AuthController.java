@@ -2,6 +2,7 @@ package com.university.controller;
 
 import com.university.model.dto.LoginRequest;
 import com.university.model.dto.RegisterRequest;
+import com.university.model.dto.SelfRegisterRequest;
 import com.university.model.dto.SetPasswordRequest;
 import com.university.model.dto.ResponseWrapper;
 import com.university.service.AuthService;
@@ -43,6 +44,17 @@ public class AuthController {
     public ResponseEntity<ResponseWrapper<Object>> setPassword(@Valid @RequestBody SetPasswordRequest request) {
         try {
             var result = authService.setPassword(request.getToken(), request.getPassword());
+            return ResponseEntity.ok(ResponseWrapper.success(result));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest()
+                    .body(ResponseWrapper.error(e.getMessage(), e.getMessage()));
+        }
+    }
+
+    @PostMapping("/self-register")
+    public ResponseEntity<ResponseWrapper<Object>> selfRegister(@Valid @RequestBody SelfRegisterRequest request) {
+        try {
+            var result = authService.selfRegister(request.getName(), request.getEmail(), request.getPassword());
             return ResponseEntity.ok(ResponseWrapper.success(result));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest()

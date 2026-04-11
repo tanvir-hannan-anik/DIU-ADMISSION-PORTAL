@@ -4,6 +4,7 @@ import { Navigation } from '../common/Navigation';
 import { authService } from '../../services/authService';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'react-toastify';
+import { getProfile as getProfileFromDb, saveProfile as saveProfileToDb } from '../../services/studentDataService';
 
 // ── Department code → info map ────────────────────────────────────────────────
 const DEPT_MAP = {
@@ -98,10 +99,26 @@ function ProfileContent({ user, navigate, logout }) {
       phone:           saved.phone           || '',
       address:         saved.address         || '',
       bloodGroup:      saved.bloodGroup      || '',
-      studentId:       saved.studentId       || '',
+      studentId:       saved.studentId       || user.studentId || '',
       currentSemester: saved.currentSemester || '',
     };
   });
+
+  // Load profile from DB on mount, merge into form
+  useEffect(() => {
+    getProfileFromDb(user.email).then(dbProfile => {
+      if (dbProfile && Object.keys(dbProfile).length > 0) {
+        setForm(prev => ({
+          name:            dbProfile.name            || prev.name,
+          phone:           dbProfile.phone           || prev.phone,
+          address:         dbProfile.address         || prev.address,
+          bloodGroup:      dbProfile.bloodGroup      || prev.bloodGroup,
+          studentId:       dbProfile.studentId       || prev.studentId,
+          currentSemester: dbProfile.semester        || prev.currentSemester,
+        }));
+      }
+    }).catch(() => {});
+  }, [user.email]);
 
   // Parsed info derived from studentId
   const parsed = parseStudentId(form.studentId);
@@ -131,6 +148,14 @@ function ProfileContent({ user, navigate, logout }) {
 
   const handleSave = () => {
     saveProfile(user.email, form);
+    saveProfileToDb(user.email, {
+      name:             form.name,
+      studentId:        form.studentId,
+      department:       parsed?.department?.name || '',
+      semester:         form.currentSemester,
+      phone:            form.phone,
+      address:          form.address,
+    });
     setEditing(false);
     toast.success('Profile saved successfully');
   };
@@ -146,7 +171,7 @@ function ProfileContent({ user, navigate, logout }) {
     <div className="antialiased min-h-screen" style={{ background: '#f7f9fb', color: '#191c1e' }}>
       <Navigation />
 
-      <div className="flex min-h-screen pt-20">
+      <div className="flex min-h-screen pt-16 md:pt-20">
 
         {/* ── Sidebar ─────────────────────────────────────────────── */}
         <aside className="hidden lg:flex flex-col h-[calc(100vh-80px)] sticky top-20 p-4 w-64 shrink-0 bg-white border-r border-slate-200">
@@ -161,9 +186,9 @@ function ProfileContent({ user, navigate, logout }) {
             {[
               { label: 'Overview',        icon: 'dashboard',            action: () => navigate('/') },
               { label: 'Academic Record', icon: 'school',               action: () => {}, active: true },
-              { label: 'Financials',      icon: 'account_balance',      action: () => {} },
+              { label: 'Financials',      icon: 'account_balance',      action: () => window.open('https://studentportal.diu.edu.bd/', '_blank') },
               { label: 'Enrollment',      icon: 'assignment_turned_in', action: () => navigate('/course-registration') },
-              { label: 'Support',         icon: 'help_outline',         action: () => {} },
+              { label: 'Support',         icon: 'help_outline',         action: () => window.open('mailto:support@daffodilvarsity.edu.bd?subject=Student Support Request', '_blank') },
             ].map(({ label, icon, action, active }) => (
               <button key={label} onClick={action}
                 className={`flex items-center gap-3 w-full text-left p-3 rounded-lg text-sm font-semibold uppercase tracking-wider transition-all duration-200
@@ -185,7 +210,7 @@ function ProfileContent({ user, navigate, logout }) {
         </aside>
 
         {/* ── Main ────────────────────────────────────────────────── */}
-        <main className="flex-grow p-6 lg:p-12 overflow-y-auto">
+        <main className="flex-grow p-4 md:p-6 lg:p-12 overflow-y-auto pb-24 lg:pb-12">
 
           {/* Profile Header */}
           <section className="mb-14 flex flex-col md:flex-row gap-8 items-start">
@@ -213,7 +238,7 @@ function ProfileContent({ user, navigate, logout }) {
 
             {/* Name + badges */}
             <div className="flex-grow">
-              <h1 className="text-4xl md:text-5xl font-black tracking-tighter mb-3 text-[#000155]">
+              <h1 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tighter mb-3 text-[#000155]">
                 {form.name || 'Your Name'}
               </h1>
               <div className="flex flex-wrap gap-3 items-center text-sm">
@@ -451,7 +476,8 @@ function ProfileContent({ user, navigate, logout }) {
                 <h3 className="text-xl font-bold text-[#000155] tracking-tight mb-5">Quick Access</h3>
                 <div className="space-y-1">
                   {[
-                    { label: 'Course Registration', icon: 'menu_book',   action: () => navigate('/course-registration') },
+                    { label: 'Course Reg',          icon: 'menu_book',   action: () => navigate('/course-registration') },
+                    { label: 'Financials',          icon: 'payments',    action: () => window.open('https://studentportal.diu.edu.bd/', '_blank') },
                     { label: 'Dashboard',           icon: 'home',        action: () => navigate('/') },
                     {
                       label: 'Student Portal (DIU)',
@@ -488,6 +514,29 @@ function ProfileContent({ user, navigate, logout }) {
           </div>
         </main>
       </div>
+
+      {/* ── Mobile Bottom Nav ───────────────────────────────────────────────── */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-2 py-2 border-t border-slate-200"
+           style={{ background: 'white', boxShadow: '0 -2px 12px rgba(0,0,0,0.06)' }}>
+        {[
+          { icon: 'home',               label: 'Home',     action: () => navigate('/') },
+          { icon: 'menu_book',          label: 'Courses',  action: () => navigate('/course-registration') },
+          { icon: 'pending_actions',    label: 'Late Reg', action: () => navigate('/late-registration') },
+          { icon: 'account_circle',     label: 'Profile',  action: () => {}, active: true },
+          { icon: 'logout',             label: 'Logout',   action: handleLogout },
+        ].map(({ icon, label, action, active }) => (
+          <button key={label} onClick={action}
+            className="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-colors"
+            style={{ color: active ? '#0c1282' : '#94a3b8' }}>
+            <span className="material-symbols-outlined text-xl"
+                  style={active ? { fontVariationSettings: "'FILL' 1" } : {}}>{icon}</span>
+            <span className="text-[9px] font-bold uppercase tracking-wide">{label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* Bottom padding so content isn't hidden behind mobile nav */}
+      <div className="lg:hidden h-16" />
     </div>
   );
 }

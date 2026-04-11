@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { authService } from '../../services/authService';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
@@ -11,6 +12,25 @@ export const LoginPage = () => {
   const [loading,      setLoading]      = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [remember,     setRemember]     = useState(false);
+
+  // Forgot password modal state
+  const [showForgot,   setShowForgot]   = useState(false);
+  const [resetEmail,   setResetEmail]   = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetResult,  setResetResult]  = useState(null); // { link } | { error }
+
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setResetLoading(true);
+    setResetResult(null);
+    const res = await authService.requestPasswordReset(resetEmail);
+    if (res.success) {
+      setResetResult({ link: res.resetLink });
+    } else {
+      setResetResult({ error: res.error });
+    }
+    setResetLoading(false);
+  };
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -29,12 +49,7 @@ export const LoginPage = () => {
       } else {
         localStorage.removeItem('diu_remember_me');
       }
-      // Admin goes to admin panel, students go to dashboard
-      if (form.email.trim().toLowerCase() === 'admin@diu.edu.bd') {
-        navigate('/admin');
-      } else {
-        navigate('/');
-      }
+      navigate('/');
     } else {
       const msg = result.error;
       if (msg === 'INVALID_CREDENTIALS') setError('Invalid email or password.');
@@ -148,7 +163,8 @@ export const LoginPage = () => {
                   Secure Password
                 </label>
                 <button type="button" className="text-sm font-bold hover:underline underline-offset-4"
-                  style={{ color: '#0c1282' }}>
+                  style={{ color: '#0c1282' }}
+                  onClick={() => { setShowForgot(true); setResetEmail(form.email); setResetResult(null); }}>
                   Forgot password?
                 </button>
               </div>
@@ -261,9 +277,83 @@ export const LoginPage = () => {
       {/* Footer */}
       <footer className="fixed bottom-6 left-0 w-full text-center px-6 pointer-events-none">
         <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#767684', opacity: 0.5 }}>
-          Daffodil International University © 2025 • Academic Excellence &amp; Precision
+          Daffodil International University © 2026 • Academic Excellence &amp; Precision
         </p>
       </footer>
+
+      {/* ── Forgot Password Modal ─────────────────────────────────────────── */}
+      {showForgot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowForgot(false)}>
+          <div className="w-full max-w-md rounded-2xl p-8 shadow-2xl"
+            style={{ backgroundColor: 'white', fontFamily: 'Manrope, sans-serif' }}
+            onClick={e => e.stopPropagation()}>
+
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-extrabold tracking-tight" style={{ color: '#000155' }}>Reset Password</h2>
+                <p className="text-xs mt-1" style={{ color: '#767684' }}>Enter your registered email to get a reset link.</p>
+              </div>
+              <button onClick={() => setShowForgot(false)} style={{ color: '#767684' }}
+                onMouseEnter={e => e.currentTarget.style.color = '#191c1e'}
+                onMouseLeave={e => e.currentTarget.style.color = '#767684'}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {!resetResult ? (
+              <form onSubmit={handleForgotSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#464652' }}>
+                    Email Address
+                  </label>
+                  <input
+                    type="email" required value={resetEmail}
+                    onChange={e => setResetEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="w-full px-4 py-3 rounded-xl text-sm outline-none"
+                    style={{ backgroundColor: '#f2f4f6', border: 'none', color: '#191c1e' }}
+                    onFocus={e => e.currentTarget.style.boxShadow = '0 0 0 2px rgba(12,18,130,0.3)'}
+                    onBlur={e => e.currentTarget.style.boxShadow = 'none'}
+                  />
+                </div>
+                <button type="submit" disabled={resetLoading}
+                  className="w-full py-3 rounded-xl font-bold text-white transition-all disabled:opacity-50"
+                  style={{ backgroundColor: '#0c1282' }}>
+                  {resetLoading ? 'Sending...' : 'Send Reset Link'}
+                </button>
+              </form>
+            ) : resetResult.error ? (
+              <div className="text-center space-y-4">
+                <span className="material-symbols-outlined text-4xl" style={{ color: '#ba1a1a' }}>error</span>
+                <p className="font-bold" style={{ color: '#ba1a1a' }}>{resetResult.error}</p>
+                <button onClick={() => setResetResult(null)}
+                  className="w-full py-3 rounded-xl font-bold border"
+                  style={{ borderColor: '#0c1282', color: '#0c1282' }}>
+                  Try Again
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-4 rounded-xl" style={{ backgroundColor: '#d5e3fc' }}>
+                  <span className="material-symbols-outlined" style={{ color: '#0c1282', fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                  <p className="text-sm font-bold" style={{ color: '#000155' }}>Reset link generated!</p>
+                </div>
+                <p className="text-xs" style={{ color: '#464652' }}>
+                  In production this would be emailed. Click the link below to reset your password:
+                </p>
+                <button
+                  onClick={() => { setShowForgot(false); navigate(resetResult.link); }}
+                  className="w-full py-3 rounded-xl font-bold text-white"
+                  style={{ backgroundColor: '#0c1282' }}>
+                  Open Reset Link
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

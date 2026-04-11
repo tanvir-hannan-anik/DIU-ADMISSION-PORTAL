@@ -12,6 +12,8 @@ export const RegisterPage = () => {
   const [agreed, setAgreed]           = useState(false);
   const [error, setError]             = useState('');
   const [loading, setLoading]         = useState(false);
+  const [showTerms, setShowTerms]     = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -291,12 +293,12 @@ export const RegisterPage = () => {
                 <label htmlFor="terms" className="text-xs leading-relaxed" style={{ color: '#464652' }}>
                   I agree to the{' '}
                   <button type="button" className="font-bold hover:underline underline-offset-2"
-                    style={{ color: '#000155' }}>
+                    style={{ color: '#000155' }} onClick={() => setShowTerms(true)}>
                     Institutional Terms of Use
                   </button>{' '}
                   and acknowledge the{' '}
                   <button type="button" className="font-bold hover:underline underline-offset-2"
-                    style={{ color: '#000155' }}>
+                    style={{ color: '#000155' }} onClick={() => setShowPrivacy(true)}>
                     Data Privacy Policy
                   </button>{' '}
                   for students.
@@ -360,9 +362,79 @@ export const RegisterPage = () => {
       {/* Footer */}
       <footer className="fixed bottom-8 left-8 hidden lg:block pointer-events-none">
         <p className="text-xs font-medium uppercase tracking-widest" style={{ color: '#767684' }}>
-          © 2025 Daffodil International University — Office of Admissions
+          © 2026 Daffodil International University — Office of Admissions
         </p>
       </footer>
+
+      {/* ── Terms of Use Modal ──────────────────────────────────────────────── */}
+      {showTerms && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowTerms(false)}>
+          <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl"
+            style={{ backgroundColor: 'white', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #e6e8ea' }}>
+              <h2 className="text-lg font-extrabold tracking-tight" style={{ color: '#000155' }}>Institutional Terms of Use</h2>
+              <button onClick={() => setShowTerms(false)} style={{ color: '#767684' }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="px-6 py-4 overflow-y-auto text-sm space-y-4" style={{ color: '#464652', lineHeight: 1.7 }}>
+              <p><strong>1. Acceptance</strong> — By creating an account on the DIU Academic Portal, you agree to these terms and all applicable university policies.</p>
+              <p><strong>2. Eligibility</strong> — Access is restricted to current students, admitted applicants, and authorised university staff of Daffodil International University.</p>
+              <p><strong>3. Account Security</strong> — You are responsible for maintaining the confidentiality of your credentials. Do not share your password with anyone.</p>
+              <p><strong>4. Acceptable Use</strong> — The portal must only be used for legitimate academic purposes. Any attempt to manipulate records, impersonate others, or gain unauthorised access will result in immediate account suspension and potential legal action.</p>
+              <p><strong>5. Academic Integrity</strong> — All course registrations, submissions, and records must reflect your own legitimate academic work. Fraudulent registrations are strictly prohibited.</p>
+              <p><strong>6. Data Accuracy</strong> — You agree to provide accurate and truthful information during registration and throughout your use of the portal.</p>
+              <p><strong>7. Modifications</strong> — DIU reserves the right to modify these terms at any time. Continued use constitutes acceptance of the updated terms.</p>
+              <p><strong>8. Contact</strong> — For questions regarding these terms, contact the Registrar's Office at registrar@daffodilvarsity.edu.bd.</p>
+            </div>
+            <div className="px-6 py-4" style={{ borderTop: '1px solid #e6e8ea' }}>
+              <button onClick={() => { setAgreed(true); setShowTerms(false); }}
+                className="w-full py-3 rounded-xl font-bold text-white"
+                style={{ backgroundColor: '#0c1282' }}>
+                I Accept These Terms
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Privacy Policy Modal ────────────────────────────────────────────── */}
+      {showPrivacy && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowPrivacy(false)}>
+          <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl"
+            style={{ backgroundColor: 'white', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #e6e8ea' }}>
+              <h2 className="text-lg font-extrabold tracking-tight" style={{ color: '#000155' }}>Data Privacy Policy</h2>
+              <button onClick={() => setShowPrivacy(false)} style={{ color: '#767684' }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="px-6 py-4 overflow-y-auto text-sm space-y-4" style={{ color: '#464652', lineHeight: 1.7 }}>
+              <p><strong>1. Data We Collect</strong> — We collect your name, email, student ID, academic records, course registrations, and activity logs within this portal.</p>
+              <p><strong>2. How We Use Your Data</strong> — Your data is used to manage your academic registration, process applications, communicate important notices, and maintain institutional records as required by the University Grants Commission of Bangladesh.</p>
+              <p><strong>3. Data Storage</strong> — All personal data is stored on secure university servers within Bangladesh. We do not transfer your data outside the country without your explicit consent.</p>
+              <p><strong>4. Data Retention</strong> — Academic records are retained for a minimum of 10 years after graduation or departure, as required by national education regulations.</p>
+              <p><strong>5. Your Rights</strong> — You have the right to access, correct, or request deletion of your personal data by contacting the Data Protection Officer at dpo@daffodilvarsity.edu.bd.</p>
+              <p><strong>6. Cookies</strong> — This portal uses session cookies and localStorage to maintain your login state. No third-party tracking cookies are used.</p>
+              <p><strong>7. Security</strong> — We implement industry-standard security measures including JWT authentication, password hashing, and encrypted data transmission.</p>
+              <p><strong>8. Contact</strong> — Data Protection Officer: Daffodil International University, 102/1 Shukrabad, Mirpur Road, Dhanmondi, Dhaka-1207.</p>
+            </div>
+            <div className="px-6 py-4" style={{ borderTop: '1px solid #e6e8ea' }}>
+              <button onClick={() => setShowPrivacy(false)}
+                className="w-full py-3 rounded-xl font-bold text-white"
+                style={{ backgroundColor: '#0c1282' }}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
