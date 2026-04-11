@@ -32,7 +32,9 @@ services:
     restart: unless-stopped
 
   spring-boot:
-    build: ./backend-spring-boot
+    build:
+      context: .
+      dockerfile: backend-spring-boot/Dockerfile
     container_name: diu_spring_boot
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/university_automation?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
