@@ -22,6 +22,7 @@ services:
   - type: web
     name: diu-spring-api
     runtime: docker
+    rootDir: backend-spring-boot
     dockerfilePath: backend-spring-boot/Dockerfile
     envVars:
       - key: PYTHON_SERVICE_URL
