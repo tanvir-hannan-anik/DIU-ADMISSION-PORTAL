@@ -4,7 +4,7 @@ import { Navigation } from '../common/Navigation';
 import { authService } from '../../services/authService';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'react-toastify';
-import { getProfile as getProfileFromDb, saveProfile as saveProfileToDb } from '../../services/studentDataService';
+import { getProfile as getProfileFromDb, saveProfile as saveProfileToDb, getActiveEnrollment } from '../../services/studentDataService';
 
 // ── Department code → info map ────────────────────────────────────────────────
 const DEPT_MAP = {
@@ -91,6 +91,7 @@ function ProfileContent({ user, navigate, logout }) {
   const fileRef   = useRef(null);
   const [editing,  setEditing]  = useState(false);
   const [photo,    setPhoto]    = useState(() => loadPhoto(user.email));
+  const [enrollment, setEnrollment] = useState(() => getActiveEnrollment(user.email));
 
   const [form, setForm] = useState(() => {
     const saved = loadProfile(user.email);
@@ -118,6 +119,13 @@ function ProfileContent({ user, navigate, logout }) {
         }));
       }
     }).catch(() => {});
+  }, [user.email]);
+
+  // Refresh enrollment whenever the page is focused (student may have just enrolled)
+  useEffect(() => {
+    const refresh = () => setEnrollment(getActiveEnrollment(user.email));
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
   }, [user.email]);
 
   // Parsed info derived from studentId
@@ -375,6 +383,86 @@ function ProfileContent({ user, navigate, logout }) {
                   </div>
                 </div>
               </div>
+
+              {/* ── Enrolled Courses Card ─────────────────────────── */}
+              {enrollment ? (
+                <div className="bg-white rounded-xl border border-slate-200/70 shadow-sm overflow-hidden">
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100"
+                       style={{ background: 'linear-gradient(135deg,#0c1282 0%,#1a237e 100%)' }}>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-1">Currently Enrolled</p>
+                      <h3 className="text-xl font-black text-white tracking-tight">{enrollment.semester}</h3>
+                    </div>
+                    <div className="text-right">
+                      <span className="inline-flex items-center gap-1 bg-emerald-400/20 text-emerald-300 text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
+                        LOCKED
+                      </span>
+                      <p className="text-white/40 text-[10px] mt-1">{new Date(enrollment.registeredAt).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' })}</p>
+                    </div>
+                  </div>
+
+                  {/* Summary row */}
+                  <div className="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100">
+                    {[
+                      { label: 'Courses',  value: enrollment.courses.length },
+                      { label: 'Credits',  value: enrollment.totalCredits   },
+                      { label: 'Fee Paid', value: `৳${Number(enrollment.totalFee).toLocaleString()}` },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="p-4 text-center">
+                        <p className="text-xl font-black text-[#000155]">{value}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-0.5">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Course list */}
+                  <div className="divide-y divide-slate-50">
+                    {enrollment.courses.map((c, i) => {
+                      const typeColor = c.type === 'retake' ? '#f59e0b' : c.type === 'drop' ? '#ef4444' : '#0c1282';
+                      const typeBg   = c.type === 'retake' ? '#fef3c7' : c.type === 'drop' ? '#fee2e2' : '#e8eaf6';
+                      return (
+                        <div key={i} className="flex items-center gap-4 px-6 py-3 hover:bg-slate-50 transition-colors">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-xs font-black"
+                               style={{ backgroundColor: typeBg, color: typeColor }}>
+                            {i + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-[#000155] truncate">{c.subject}</p>
+                            <p className="text-[11px] text-slate-400 font-semibold">{c.course_code} · {c.credits} cr · <span className="text-slate-500">{c.faculty}</span></p>
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full shrink-0"
+                                style={{ backgroundColor: typeBg, color: typeColor }}>
+                            {c.type || 'regular'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs text-slate-400 font-semibold">Enrollment is fixed for this semester</span>
+                    <button onClick={() => navigate('/course-registration')}
+                      className="text-xs font-bold text-[#0c1282] hover:underline flex items-center gap-1">
+                      View Details
+                      <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-dashed border-slate-200 p-8 text-center">
+                  <span className="material-symbols-outlined text-4xl text-slate-200 mb-3 block">menu_book</span>
+                  <p className="font-bold text-slate-400 text-sm">No enrollment yet</p>
+                  <p className="text-xs text-slate-300 mt-1 mb-4">Complete course registration to see your enrolled courses here.</p>
+                  <button onClick={() => navigate('/course-registration')}
+                    className="text-xs font-bold text-white px-4 py-2 rounded-lg"
+                    style={{ backgroundColor: '#0c1282' }}>
+                    Register Now
+                  </button>
+                </div>
+              )}
 
               {/* Stats bento */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">

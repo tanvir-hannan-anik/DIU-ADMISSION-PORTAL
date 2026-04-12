@@ -16,6 +16,8 @@ import { SetPasswordPage }        from './components/auth/SetPasswordPage';
 import { CourseRegistrationPage } from './components/student/CourseRegistrationPage';
 import { LateRegistrationPage }   from './components/student/LateRegistrationPage';
 import { ProfilePage }            from './components/student/ProfilePage';
+import { FacilitiesPage }         from './components/facilities/FacilitiesPage';
+import { FacultyPage }            from './components/faculty/FacultyPage';
 
 // ── Protected route: redirects to /login if not authenticated ─────────────────
 function ProtectedRoute({ children }) {
@@ -58,6 +60,10 @@ function App() {
           <Route path="/course-registration" element={<ProtectedRoute><CourseRegistrationPage /></ProtectedRoute>} />
           <Route path="/late-registration"   element={<ProtectedRoute><LateRegistrationPage /></ProtectedRoute>} />
           <Route path="/profile"             element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+
+          {/* Info pages */}
+          <Route path="/facilities" element={<FacilitiesPage />} />
+          <Route path="/faculty"    element={<FacultyPage />} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" />} />

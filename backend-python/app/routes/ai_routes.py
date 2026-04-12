@@ -89,8 +89,8 @@ def smart_advisor():
             if role in ('user', 'assistant'):
                 groq_messages.append({'role': role, 'content': m.get('content', '')})
 
-        completion = groq_svc.client.chat.completions.create(
-            model=groq_svc.model,
+        completion = groq_svc.advisor_client.chat.completions.create(
+            model=groq_svc.advisor_model,
             messages=groq_messages,
             max_tokens=max_tokens,
             temperature=0.7,

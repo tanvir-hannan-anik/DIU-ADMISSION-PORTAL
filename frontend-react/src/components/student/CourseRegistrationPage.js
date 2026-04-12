@@ -4,7 +4,9 @@ import { authService } from '../../services/authService';
 import { toast } from 'react-toastify';
 import { SmartAdvisorFullscreen } from './SmartAdvisorFullscreen';
 import api from '../../services/api';
-import { saveCourseRegistration } from '../../services/studentDataService';
+import API_CONFIG from '../../config/apiConfig';
+import axios from 'axios';
+import { saveCourseRegistration, saveActiveEnrollment } from '../../services/studentDataService';
 
 // ── Fee constants ─────────────────────────────────────────────────────────────
 const FEE_PER_CREDIT = 30000 / 11;
@@ -19,60 +21,60 @@ const cr    = (code) => isLab(code) ? 1 : 3;
 
 const RAW_SEMESTER_DATA = {
   'Semester 1': [
-    { course_code:'ENG101',  subject:'English Language I'                        },
-    { course_code:'COF101',  subject:'Computer Fundamentals'                     },
-    { course_code:'CIS121',  subject:'Introduction to Industry 4.0'              },
-    { course_code:'CIS115',  subject:'Structured Programming'                    },
-    { course_code:'CIS115L', subject:'Structured Programming Lab'                },
+    { course_code:'ENG101',  subject:'English Language I',                          faculty:'Ms. Tamanna Akter'                   },
+    { course_code:'COF101',  subject:'Computer Fundamentals',                       faculty:'Mr. Md. Sarwar Hossain Mollah'       },
+    { course_code:'CIS121',  subject:'Introduction to Industry 4.0',                faculty:'Mr. Md. Ashiqul Islam'               },
+    { course_code:'CIS115',  subject:'Structured Programming',                      faculty:'Mr. Md. Faruk Hosen'                 },
+    { course_code:'CIS115L', subject:'Structured Programming Lab',                  faculty:'Mr. Md. Faruk Hosen'                 },
   ],
   'Semester 2': [
-    { course_code:'CIS122',  subject:'Data Structure'                            },
-    { course_code:'CIS122L', subject:'Data Structure Lab'                        },
-    { course_code:'CIS131',  subject:'Computer Architecture and Organization'    },
-    { course_code:'ENG102',  subject:'English Language II'                       },
-    { course_code:'MAT101',  subject:'Mathematics-I'                             },
+    { course_code:'CIS122',  subject:'Data Structure',                              faculty:'Mr. Md. Mehedi Hassan'               },
+    { course_code:'CIS122L', subject:'Data Structure Lab',                          faculty:'Mr. Md. Mehedi Hassan'               },
+    { course_code:'CIS131',  subject:'Computer Architecture and Organization',      faculty:'Ms. Sonia Nasrin'                    },
+    { course_code:'ENG102',  subject:'English Language II',                         faculty:'Ms. Tamanna Akter'                   },
+    { course_code:'MAT101',  subject:'Mathematics-I',                               faculty:'Mathematics Department'              },
   ],
   'Semester 3': [
-    { course_code:'CIS133',  subject:'Website Development Essentials'            },
-    { course_code:'CIS133L', subject:'Website Development Essentials Lab'        },
-    { course_code:'CIS132',  subject:'Algorithms'                                },
-    { course_code:'CIS132L', subject:'Algorithms Lab'                            },
-    { course_code:'CIS123',  subject:'Discrete Mathematics'                      },
+    { course_code:'CIS133',  subject:'Website Development Essentials',              faculty:'Mr. Israfil'                         },
+    { course_code:'CIS133L', subject:'Website Development Essentials Lab',          faculty:'Mr. Israfil'                         },
+    { course_code:'CIS132',  subject:'Algorithms',                                  faculty:'Mr. Md. Mehedi Hassan'               },
+    { course_code:'CIS132L', subject:'Algorithms Lab',                              faculty:'Mr. Md. Mehedi Hassan'               },
+    { course_code:'CIS123',  subject:'Discrete Mathematics',                        faculty:'Mr. Md. Biplob Hossain'              },
   ],
   'Semester 4': [
-    { course_code:'CIS232',  subject:'Object Oriented Programming'               },
-    { course_code:'CIS232L', subject:'Object Oriented Programming Lab'           },
-    { course_code:'CIS211',  subject:'Computer Networks'                         },
-    { course_code:'CIS211L', subject:'Computer Networks Lab'                     },
-    { course_code:'ACC101',  subject:'Accounting'                                },
+    { course_code:'CIS232',  subject:'Object Oriented Programming',                 faculty:'Mr. Md. Nasimul Kader'               },
+    { course_code:'CIS232L', subject:'Object Oriented Programming Lab',             faculty:'Mr. Md. Nasimul Kader'               },
+    { course_code:'CIS211',  subject:'Computer Networks',                           faculty:'Mr. Md. Sarwar Hossain Mollah'       },
+    { course_code:'CIS211L', subject:'Computer Networks Lab',                       faculty:'Mr. Md. Sarwar Hossain Mollah'       },
+    { course_code:'ACC101',  subject:'Accounting',                                  faculty:'Mr. Md. Arif Hassan'                 },
   ],
   'Semester 5': [
-    { course_code:'CIS222',  subject:'Database Management System'                },
-    { course_code:'CIS222L', subject:'Database Management System Lab'            },
-    { course_code:'FIN232',  subject:'Financial Management System'               },
-    { course_code:'CIS241',  subject:'Operating Systems'                         },
-    { course_code:'CIS241L', subject:'Operating Systems Lab'                     },
+    { course_code:'CIS222',  subject:'Database Management System',                  faculty:'Mr. Md. Nasimul Kader'               },
+    { course_code:'CIS222L', subject:'Database Management System Lab',              faculty:'Mr. Md. Nasimul Kader'               },
+    { course_code:'FIN232',  subject:'Financial Management System',                 faculty:'Finance Department'                  },
+    { course_code:'CIS241',  subject:'Operating Systems',                           faculty:'Mr. Md. Nasimul Kader'               },
+    { course_code:'CIS241L', subject:'Operating Systems Lab',                       faculty:'Mr. Md. Nasimul Kader'               },
   ],
   'Semester 6': [
-    { course_code:'CIS323',  subject:'Information System Architecture and Planning' },
-    { course_code:'CIS313',  subject:'Artificial Intelligence'                      },
-    { course_code:'MGT422',  subject:'Industrial Management'                        },
-    { course_code:'CIS323L', subject:'Information System Architecture Lab'          },
-    { course_code:'CIS313L', subject:'Artificial Intelligence Lab'                  },
+    { course_code:'CIS323',  subject:'Information System Architecture and Planning',faculty:'Mr. Md. Sarwar Hossain Mollah'       },
+    { course_code:'CIS313',  subject:'Artificial Intelligence',                     faculty:'Mr. Md. Faruk Hosen'                 },
+    { course_code:'MGT422',  subject:'Industrial Management',                       faculty:'Management Department'               },
+    { course_code:'CIS323L', subject:'Information System Architecture Lab',         faculty:'Mr. Md. Sarwar Hossain Mollah'       },
+    { course_code:'CIS313L', subject:'Artificial Intelligence Lab',                 faculty:'Mr. Md. Faruk Hosen'                 },
   ],
   'Semester 7': [
-    { course_code:'ECO314',  subject:'Economics'                                 },
-    { course_code:'CIS324',  subject:'Web Engineering'                           },
-    { course_code:'CIS324L', subject:'Web Engineering Lab'                       },
-    { course_code:'IoT336',  subject:'IoT and Embedded Systems'                  },
-    { course_code:'IoT336L', subject:'IoT and Embedded Systems Lab'              },
-    { course_code:'BI334',   subject:'Data Analysis and Business Modeling'       },
+    { course_code:'ECO314',  subject:'Economics',                                   faculty:'Business & Entrepreneurship Dept'    },
+    { course_code:'CIS324',  subject:'Web Engineering',                             faculty:'Mr. Israfil'                         },
+    { course_code:'CIS324L', subject:'Web Engineering Lab',                         faculty:'Mr. Israfil'                         },
+    { course_code:'IoT336',  subject:'IoT and Embedded Systems',                    faculty:'Mr. Md. Ashiqul Islam'               },
+    { course_code:'IoT336L', subject:'IoT and Embedded Systems Lab',                faculty:'Mr. Md. Ashiqul Islam'               },
+    { course_code:'BI334',   subject:'Data Analysis and Business Modeling',         faculty:'Mr. Md. Mehedi Hassan'               },
   ],
   'Semester 8': [
-    { course_code:'CIS414',  subject:'Information System Management / MSS'      },
-    { course_code:'IoT429',  subject:'Machine Learning for IoT'                  },
-    { course_code:'CIS435',  subject:'Cloud Computing'                           },
-    { course_code:'CIS435L', subject:'Cloud Computing Lab'                       },
+    { course_code:'CIS414',  subject:'Information System Management / MSS',        faculty:'Ms. Sonia Nasrin'                    },
+    { course_code:'IoT429',  subject:'Machine Learning for IoT',                    faculty:'Mr. Md. Faruk Hosen'                 },
+    { course_code:'CIS435',  subject:'Cloud Computing',                             faculty:'Mr. Md. Biplob Hossain'              },
+    { course_code:'CIS435L', subject:'Cloud Computing Lab',                         faculty:'Mr. Md. Biplob Hossain'              },
   ],
 };
 
@@ -110,11 +112,27 @@ function calcFees(cart) {
   };
 }
 
+// Renders **bold** markers as <strong> and preserves line breaks
+function renderAdvisorContent(text) {
+  return text.split('\n').map((line, li) => {
+    const parts = line.split(/\*\*(.*?)\*\*/g);
+    return (
+      <span key={li}>
+        {parts.map((part, pi) => pi % 2 === 1 ? <strong key={pi}>{part}</strong> : part)}
+        {'\n'}
+      </span>
+    );
+  });
+}
+
 async function callDeepSeek(msgs, sys) {
-  const res = await api.post('/v1/ai/process', { messages: msgs, systemPrompt: sys, maxTokens: 512 });
+  const url = `${API_CONFIG.AI_BASE_URL}/api/v1/ai/smart-advisor`;
+  console.log('[SmartAdvisor] calling:', url, 'msgs:', msgs.length);
+  const res = await axios.post(url, { messages: msgs, systemPrompt: sys, maxTokens: 1024 });
+  console.log('[SmartAdvisor] response:', res.data);
   const data = res.data;
   if (!data.success) throw new Error(data.message || 'Backend error');
-  return data.data?.reply || data.data?.response || '';
+  return data.reply || '';
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -214,12 +232,21 @@ export const CourseRegistrationPage = () => {
         setChatMsgs(p => [...p, { role:'assistant', content:`🎓 All checks passed!\n\n✅ Payment: Confirmed\n✅ Teaching Evaluations: Completed\n✅ Smart Advisor Approval: GRANTED\n\nYou are now enrolled in ${cart.length} course(s). Congratulations!` }]);
         setApproved(true); setStep(4);
         toast.success('Registration complete! Smart Advisor approved.');
+        const enrolledCourses = cart.map(c => ({ ...c.course, type: c.type }));
+        const enrolledAt = new Date().toISOString();
         saveCourseRegistration(user?.email, {
           semester: selSem,
-          courses: cart.map(c => ({ ...c.course, type: c.type })),
+          courses: enrolledCourses,
           totalCredits: fees.totalCr,
           totalFee: fees.total,
           status: 'APPROVED',
+        });
+        saveActiveEnrollment(user?.email, {
+          semester: selSem,
+          courses: enrolledCourses,
+          totalCredits: fees.totalCr,
+          totalFee: fees.total,
+          registeredAt: enrolledAt,
         });
       }, 3000);
     }, 1500);
@@ -229,17 +256,52 @@ export const CourseRegistrationPage = () => {
     const reg = cart.filter(c=>c.type==='regular');
     const ret = cart.filter(c=>c.type==='retake');
     const drp = cart.filter(c=>c.type==='drop');
-    return `You are Smart Advisor at Daffodil International University (DIU), Bangladesh.
-CONTEXT:
-- Semester: ${selSem}
-- Regular courses (${reg.length}): ${reg.map(c=>`${c.course.course_code} ${c.course.subject}`).join('; ')||'None'}
-- Retake (${ret.length}): ${ret.map(c=>c.course.course_code).join(', ')||'None'}
-- Drop (${drp.length}): ${drp.map(c=>c.course.course_code).join(', ')||'None'}
-- Credits: ${fees.totalCr} | Fee: ৳${fees.total.toLocaleString()}
-- Payment: ${paymentDone?'CONFIRMED':'PENDING'} | Teaching Eval: ${evalDone?'DONE':'PENDING'} | Approved: ${approved?'YES':'NO'}
-- Step: ${step}/4
-FEE: ৳30,000/11cr regular | ৳3,000 retake | ৳1,000 drop | Max ${MAX_CREDITS}cr
-Respond concisely (<120 words). Be friendly and professional.`;
+    const allSemesterInfo = Object.entries(RAW_SEMESTER_DATA).map(([sem, courses]) =>
+      `${sem}:\n` + courses.map(c=>`  - ${c.course_code} | ${c.subject} | ${c.credits||cr(c.course_code)} cr | Faculty: ${c.faculty}`).join('\n')
+    ).join('\n');
+    return `You are Smart Advisor at Daffodil International University (DIU), Bangladesh — a Course Registration expert.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STUDENT CURRENT SESSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Selected Semester: ${selSem}
+- Step: ${step}/4 (1=Course Selection, 2=Payment, 3=Advisor Approval, 4=Complete)
+- Regular courses (${reg.length}): ${reg.map(c=>`${c.course.course_code} - ${c.course.subject}`).join('; ')||'None selected'}
+- Retake courses (${ret.length}): ${ret.map(c=>`${c.course.course_code} - ${c.course.subject}`).join('; ')||'None'}
+- Drop courses (${drp.length}): ${drp.map(c=>`${c.course.course_code} - ${c.course.subject}`).join('; ')||'None'}
+- Total Credits: ${fees.totalCr} | Total Fee: ৳${fees.total.toLocaleString()}
+- Payment: ${paymentDone?'✅ CONFIRMED':'⏳ PENDING'} | Teaching Eval: ${evalDone?'✅ DONE':'⏳ PENDING'} | Advisor Approved: ${approved?'✅ YES':'⏳ NO'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEE RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Regular: ৳30,000 per 11 credits (≈৳2,727/credit)
+- Retake: ৳3,000 per course (flat)
+- Drop: ৳1,000 per course (flat)
+- Min credits: ${MIN_CREDITS} | Max credits: ${MAX_CREDITS}
+- Lab courses: 1 credit | Theory courses: 3 credits
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REGISTRATION STEPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 1 → Select courses (regular/retake/drop), stay within ${MIN_CREDITS}–${MAX_CREDITS} credits
+Step 2 → Pay fees online (bKash/card/bank)
+Step 3 → Complete Teaching Evaluation + get Smart Advisor approval
+Step 4 → Registration complete — receive confirmation
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FULL COURSE CATALOG (CIS Department, DIU)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${allSemesterInfo}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+YOUR ROLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Answer questions about any course: name, code, credits, faculty/sir name
+- Help calculate fees for any combination of courses
+- Guide the student through the 4-step registration process
+- Advise on course selection, prerequisites, and credit limits
+- Be warm, friendly, and concise (<150 words unless detailed calculation needed)`;
   };
 
   const sendChat = async () => {
@@ -250,7 +312,7 @@ Respond concisely (<120 words). Be friendly and professional.`;
       const reply = await callDeepSeek(updated.slice(-12), buildSys());
       setChatMsgs(p => [...p, {role:'assistant',content:reply}]);
       if (!approved && paymentDone && evalDone && reply.toLowerCase().includes('approv')) { setApproved(true); setStep(4); }
-    } catch { setChatMsgs(p => [...p, {role:'assistant',content:"I'm temporarily unavailable. Please try again."}]); }
+    } catch (err) { console.error('[SmartAdvisor] sendChat error:', err); setChatMsgs(p => [...p, {role:'assistant',content:"I'm temporarily unavailable. Please try again."}]); }
     finally { setChatLoading(false); }
   };
 
@@ -834,7 +896,7 @@ Respond concisely (<120 words). Be friendly and professional.`;
                        style={m.role==='user'
                          ? { background:'#0c1282', color:'white', borderBottomRightRadius:'4px' }
                          : { background:'white', color:'#191c1e', borderBottomLeftRadius:'4px', border:'1px solid #e6e8ea' }}>
-                    {m.content}
+                    {m.role === 'assistant' ? renderAdvisorContent(m.content) : m.content}
                   </div>
                 </div>
               ))}

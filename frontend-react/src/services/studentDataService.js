@@ -110,6 +110,29 @@ export const saveLateRegistration = async (email, { semester, courses, reason, e
   }
 };
 
+// ── Active Enrollment (current semester, fixed once approved) ──────────────────
+
+export const saveActiveEnrollment = (email, { semester, courses, totalCredits, totalFee, registeredAt }) => {
+  const record = { email, semester, courses, totalCredits, totalFee, registeredAt, status: 'ENROLLED' };
+  localStorage.setItem(`diu_active_enrollment_${email}`, JSON.stringify(record));
+  // Also keep a per-semester snapshot so history is preserved
+  localStorage.setItem(`diu_enrollment_${email}_${semester}`, JSON.stringify(record));
+};
+
+export const getActiveEnrollment = (email) => {
+  try {
+    const record = localStorage.getItem(`diu_active_enrollment_${email}`);
+    return record ? JSON.parse(record) : null;
+  } catch { return null; }
+};
+
+export const getEnrollmentBySemester = (email, semester) => {
+  try {
+    const record = localStorage.getItem(`diu_enrollment_${email}_${semester}`);
+    return record ? JSON.parse(record) : null;
+  } catch { return null; }
+};
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function parseJson(str, fallback) {
