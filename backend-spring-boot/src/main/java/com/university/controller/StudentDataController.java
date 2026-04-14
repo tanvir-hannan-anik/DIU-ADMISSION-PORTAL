@@ -50,8 +50,10 @@ public class StudentDataController {
         if (body.containsKey("semester"))         profile.setSemester((String) body.get("semester"));
         if (body.containsKey("phone"))            profile.setPhone((String) body.get("phone"));
         if (body.containsKey("address"))          profile.setAddress((String) body.get("address"));
-        if (body.containsKey("cgpa"))             profile.setCgpa(((Number) body.get("cgpa")).doubleValue());
-        if (body.containsKey("creditsCompleted")) profile.setCreditsCompleted(((Number) body.get("creditsCompleted")).intValue());
+        if (body.containsKey("cgpa") && body.get("cgpa") instanceof Number)
+            profile.setCgpa(((Number) body.get("cgpa")).doubleValue());
+        if (body.containsKey("creditsCompleted") && body.get("creditsCompleted") instanceof Number)
+            profile.setCreditsCompleted(((Number) body.get("creditsCompleted")).intValue());
 
         profileRepo.save(profile);
         return ResponseEntity.ok(ResponseWrapper.success(profile));

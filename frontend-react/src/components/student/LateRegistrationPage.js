@@ -7,6 +7,14 @@ import api from '../../services/api';
 import API_CONFIG from '../../config/apiConfig';
 import axios from 'axios';
 import { saveLateRegistration } from '../../services/studentDataService';
+
+const DIU_NOTIFICATIONS = [
+  { id:1, icon:'warning',       title:'Late Registration Open',    body:'Submit your late registration before the deadline', time:'Just now', unread:true,  color:'#ba1a1a' },
+  { id:2, icon:'payments',      title:'Late Fee Applied',          body:'Additional late fee of ৳5,000 has been applied',   time:'1h ago',  unread:true,  color:'#b45309' },
+  { id:3, icon:'event',         title:'Registration Closes Soon',  body:'Late registration window closes in 3 days',         time:'2d ago',  unread:false, color:'#0c1282' },
+  { id:4, icon:'menu_book',     title:'Course Material Available', body:'CIS222 lecture notes uploaded by faculty',          time:'3d ago',  unread:false, color:'#166534' },
+  { id:5, icon:'campaign',      title:'Academic Calendar Update',  body:'Mid-term exams scheduled: June 10–20, 2026',        time:'4d ago',  unread:false, color:'#7c3aed' },
+];
 const FEE_PER_CREDIT    = 30000 / 11;
 const RETAKE_FEE        = 3000;
 const DROP_FEE          = 1000;
@@ -188,9 +196,22 @@ export const LateRegistrationPage = () => {
   const [cart,     setCart]     = useState([]);
   const [checked,  setChecked]  = useState({});
   const [allChk,   setAllChk]   = useState(false);
-  const [showPicker,  setShowPicker]  = useState(false);
-  const [pickerType,  setPickerType]  = useState('regular');
-  const [pickerSearch,setPickerSearch]= useState('');
+  const [showPicker,    setShowPicker]    = useState(false);
+  const [pickerType,    setPickerType]    = useState('regular');
+  const [pickerSearch,  setPickerSearch]  = useState('');
+  const [showSearchDrop, setShowSearchDrop] = useState(false);
+  const [showNotifs,     setShowNotifs]     = useState(false);
+  const notifsRef = useRef(null);
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (notifsRef.current && !notifsRef.current.contains(e.target)) setShowNotifs(false);
+      if (searchRef.current && !searchRef.current.contains(e.target)) setShowSearchDrop(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // workflow
   const [step,      setStep]      = useState(1);
@@ -509,14 +530,62 @@ YOUR ROLE
       {/* ── Top App Bar ─────────────────────────────────────────────────────── */}
       <header className="fixed top-0 w-full z-40 flex justify-between items-center px-6 h-16"
         style={{ background:'rgba(247,249,251,0.85)', backdropFilter:'blur(12px)', boxShadow:'0 1px 3px rgba(0,0,0,0.08)' }}>
-        <div className="flex items-center gap-6">
-          <span className="text-xl font-extrabold tracking-tight" style={{ color:'#1e3a5f' }}>Academic Portal</span>
-          <div className="hidden md:flex items-center px-3 py-1.5 rounded-full gap-1" style={{ background:'#e6e8ea' }}>
-            <span className="material-symbols-outlined text-sm" style={{ color:'#464652' }}>search</span>
-            <input placeholder="Search courses..." className="bg-transparent border-none outline-none text-sm w-40"
-              style={{ color:'#191c1e' }} value={pickerSearch}
-              onChange={e => setPickerSearch(e.target.value)}
-              onFocus={() => { setShowPicker(true); setPickerType('regular'); }} />
+        <div className="flex items-center gap-4">
+          <img src="/diulogo.png" alt="Daffodil International University"
+               className="h-9 w-auto cursor-pointer" onClick={() => navigate('/')} />
+          {/* ── Inline search with dropdown ───────────────────────── */}
+          <div className="hidden md:flex relative" ref={searchRef}>
+            <div className="flex items-center px-3 py-1.5 rounded-full gap-1" style={{ background:'#e6e8ea' }}>
+              <span className="material-symbols-outlined text-sm" style={{ color:'#464652' }}>search</span>
+              <input placeholder="Search courses..." className="bg-transparent border-none outline-none text-sm w-40"
+                style={{ color:'#191c1e' }} value={pickerSearch}
+                onChange={e => { setPickerSearch(e.target.value); setShowSearchDrop(e.target.value.length > 0); }}
+                onFocus={() => { if (pickerSearch.length > 0) setShowSearchDrop(true); }} />
+              {pickerSearch && (
+                <button onClick={() => { setPickerSearch(''); setShowSearchDrop(false); }} style={{ color:'#464652' }}>
+                  <span className="material-symbols-outlined text-sm leading-none">close</span>
+                </button>
+              )}
+            </div>
+            {showSearchDrop && pickerSearch.length > 0 && (
+              <div className="absolute top-full left-0 mt-2 w-80 rounded-2xl shadow-2xl overflow-hidden z-50"
+                   style={{ background:'white', border:'1px solid #e2e8f0' }}>
+                <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom:'1px solid #f1f5f9' }}>
+                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color:'#94a3b8' }}>Course Results</span>
+                  <span className="text-xs" style={{ color:'#94a3b8' }}>{pickerList.length} found</span>
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {pickerList.length === 0
+                    ? <p className="text-center py-6 text-sm" style={{ color:'#94a3b8' }}>No courses match "{pickerSearch}"</p>
+                    : pickerList.slice(0, 8).map(course => (
+                      <button key={course.course_code}
+                        onClick={() => { addCourse(course, 'regular'); setPickerSearch(''); setShowSearchDrop(false); }}
+                        className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors"
+                        style={{ borderBottom:'1px solid #f8fafc' }}
+                        onMouseEnter={e => e.currentTarget.style.background='#f8fafc'}
+                        onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                        <div className="min-w-0 flex-1 mr-3">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm font-bold" style={{ color:'#0c1282' }}>{course.course_code}</span>
+                            <span className="text-xs px-1.5 py-0.5 rounded font-bold" style={{ background:'#ffdad6', color:'#ba1a1a' }}>{course.credits} cr</span>
+                          </div>
+                          <p className="text-xs truncate mt-0.5" style={{ color:'#64748b' }}>{course.subject}</p>
+                        </div>
+                        <span className="material-symbols-outlined text-sm flex-shrink-0" style={{ color:'#94a3b8' }}>add_circle</span>
+                      </button>
+                    ))
+                  }
+                </div>
+                {pickerList.length > 8 && (
+                  <div className="px-4 py-2.5" style={{ borderTop:'1px solid #f1f5f9' }}>
+                    <button className="text-xs font-bold w-full text-center" style={{ color:'#ba1a1a' }}
+                      onClick={() => { setShowPicker(true); setPickerType('regular'); setShowSearchDrop(false); }}>
+                      View all {pickerList.length} results →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -524,10 +593,53 @@ YOUR ROLE
             <span className="material-symbols-outlined text-sm">schedule</span>
             LATE REGISTRATION
           </div>
-          <button className="p-2 rounded-full hover:bg-slate-100 transition-colors" style={{ color:'#464652' }}>
-            <span className="material-symbols-outlined">notifications</span>
-            <span className="sr-only">Notifications</span>
-          </button>
+          {/* ── Notification bell with dropdown ───────────────────── */}
+          <div className="relative" ref={notifsRef}>
+            <button className="p-2 rounded-full relative hover:bg-slate-100 transition-colors"
+                    style={{ color:'#464652' }}
+                    onClick={() => setShowNotifs(v => !v)}>
+              <span className="material-symbols-outlined">notifications</span>
+              {DIU_NOTIFICATIONS.some(n => n.unread) && (
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ background:'#ba1a1a' }}></span>
+              )}
+            </button>
+            {showNotifs && (
+              <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl shadow-2xl z-50 overflow-hidden"
+                   style={{ background:'white', border:'1px solid #e2e8f0' }}>
+                <div className="flex items-center justify-between px-4 py-3.5" style={{ borderBottom:'1px solid #f1f5f9' }}>
+                  <span className="font-bold text-sm" style={{ color:'#1e293b' }}>Notifications</span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background:'#ffdad6', color:'#ba1a1a' }}>
+                    {DIU_NOTIFICATIONS.filter(n => n.unread).length} new
+                  </span>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {DIU_NOTIFICATIONS.map(n => (
+                    <div key={n.id}
+                         className="flex items-start gap-3 px-4 py-3.5 cursor-pointer transition-colors"
+                         style={{ borderBottom:'1px solid #f8fafc', background: n.unread ? '#fff5f5' : 'transparent' }}
+                         onMouseEnter={e => e.currentTarget.style.background='#f8fafc'}
+                         onMouseLeave={e => e.currentTarget.style.background= n.unread ? '#fff5f5' : 'transparent'}>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                           style={{ background: n.color + '18' }}>
+                        <span className="material-symbols-outlined text-sm" style={{ color: n.color, fontVariationSettings:"'FILL' 1" }}>{n.icon}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-bold truncate" style={{ color:'#1e293b' }}>{n.title}</p>
+                          {n.unread && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background:'#ba1a1a' }}></span>}
+                        </div>
+                        <p className="text-xs mt-0.5" style={{ color:'#64748b' }}>{n.body}</p>
+                        <p className="text-[10px] mt-1" style={{ color:'#94a3b8' }}>{n.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-4 py-3 text-center" style={{ borderTop:'1px solid #f1f5f9' }}>
+                  <button className="text-xs font-bold" style={{ color:'#ba1a1a' }}>Mark all as read</button>
+                </div>
+              </div>
+            )}
+          </div>
           <button className="p-2 rounded-full hover:bg-slate-100 transition-colors" style={{ color:'#464652' }} onClick={() => navigate('/profile')}>
             <span className="material-symbols-outlined">apps</span>
           </button>

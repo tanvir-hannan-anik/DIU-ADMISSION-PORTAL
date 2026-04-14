@@ -24,15 +24,21 @@ public class AdmissionService {
     }
 
     // ── Admission schedule per faculty ─────────────────────────
-    private static final Map<String, String[]> FACULTY_SCHEDULE = new LinkedHashMap<>();
-    static {
-        // {admissionDate, vivaDate}
-        FACULTY_SCHEDULE.put("science",     new String[]{"April 15, 2024 | 10:00 AM – 1:00 PM", "April 22, 2024 | 9:00 AM – 12:00 PM"});
-        FACULTY_SCHEDULE.put("business",    new String[]{"April 16, 2024 | 10:00 AM – 1:00 PM", "April 23, 2024 | 9:00 AM – 12:00 PM"});
-        FACULTY_SCHEDULE.put("engineering", new String[]{"April 17, 2024 | 10:00 AM – 1:00 PM", "April 24, 2024 | 9:00 AM – 12:00 PM"});
-        FACULTY_SCHEDULE.put("health",      new String[]{"April 18, 2024 | 10:00 AM – 1:00 PM", "April 25, 2024 | 9:00 AM – 12:00 PM"});
-        FACULTY_SCHEDULE.put("humanities",  new String[]{"April 19, 2024 | 10:00 AM – 1:00 PM", "April 26, 2024 | 9:00 AM – 12:00 PM"});
+    // Dates are computed dynamically: exam in the next April relative to today,
+    // so the schedule never silently shows a past year.
+    private static Map<String, String[]> buildFacultySchedule() {
+        int year = java.time.LocalDate.now().getYear();
+        // If current month is past April, schedule for next year
+        if (java.time.LocalDate.now().getMonthValue() > 4) year++;
+        Map<String, String[]> map = new LinkedHashMap<>();
+        map.put("science",     new String[]{"April 15, " + year + " | 10:00 AM – 1:00 PM", "April 22, " + year + " | 9:00 AM – 12:00 PM"});
+        map.put("business",    new String[]{"April 16, " + year + " | 10:00 AM – 1:00 PM", "April 23, " + year + " | 9:00 AM – 12:00 PM"});
+        map.put("engineering", new String[]{"April 17, " + year + " | 10:00 AM – 1:00 PM", "April 24, " + year + " | 9:00 AM – 12:00 PM"});
+        map.put("health",      new String[]{"April 18, " + year + " | 10:00 AM – 1:00 PM", "April 25, " + year + " | 9:00 AM – 12:00 PM"});
+        map.put("humanities",  new String[]{"April 19, " + year + " | 10:00 AM – 1:00 PM", "April 26, " + year + " | 9:00 AM – 12:00 PM"});
+        return map;
     }
+    private static final Map<String, String[]> FACULTY_SCHEDULE = buildFacultySchedule();
 
     private String[] getScheduleForProgram(String program) {
         if (program == null) return FACULTY_SCHEDULE.get("science");

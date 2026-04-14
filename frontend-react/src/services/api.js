@@ -24,7 +24,7 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
-    console.error('Request error:', error);
+    if (API_CONFIG.DEBUG) console.error('Request error:', error);
     return Promise.reject(error);
   }
 );
@@ -43,7 +43,7 @@ api.interceptors.response.use(
       window.location.href = '/login';
     }
 
-    console.error('Response error:', error);
+    if (API_CONFIG.DEBUG) console.error('Response error:', error);
     return Promise.reject(error);
   }
 );

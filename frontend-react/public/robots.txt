@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+
+# Block private/app routes from indexing
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /course-registration
+Disallow: /set-password
+Disallow: /verify
+
+# Allow public-facing routes
+Allow: /
+Allow: /admission
+Allow: /about
+Allow: /facilities
+Allow: /faculty
+Allow: /scholarship
+Allow: /contact
+
+Sitemap: https://diu.edu.bd/sitemap.xml

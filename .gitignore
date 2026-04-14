@@ -5,6 +5,9 @@ frontend-react/build/
 # Spring Boot compiled artifacts
 backend-spring-boot/target/
 
+# H2 local database files (runtime data — never commit)
+backend-spring-boot/data/
+
 # Python
 backend-python/__pycache__/
 backend-python/**/__pycache__/
@@ -23,3 +26,6 @@ department details/
 
 # Temp scripts
 *.ps1
+
+# PDF / binary uploads
+*.pdf

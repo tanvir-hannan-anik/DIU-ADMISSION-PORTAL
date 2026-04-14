@@ -79,9 +79,8 @@ export const LoginPage = () => {
         <section className="hidden md:flex flex-col justify-between p-12 w-2/5 text-white"
           style={{ backgroundColor: '#0c1282' }}>
           <div>
-            <div className="flex items-center gap-3 mb-12 cursor-pointer" onClick={() => navigate('/')}>
-              <span className="material-symbols-outlined text-4xl">school</span>
-              <h1 className="text-2xl font-black tracking-tighter leading-none">Academic Portal</h1>
+            <div className="mb-12 cursor-pointer" onClick={() => navigate('/')}>
+              <img src="/diulogo.png" alt="Daffodil International University" className="h-10 w-auto brightness-0 invert" />
             </div>
             <h2 className="text-4xl font-extrabold tracking-tight leading-tight mb-6">
               Access the digital archives of knowledge.
@@ -109,9 +108,8 @@ export const LoginPage = () => {
           style={{ backgroundColor: '#ffffff' }}>
 
           {/* Mobile logo */}
-          <div className="md:hidden flex items-center gap-2 mb-10 cursor-pointer" onClick={() => navigate('/')}>
-            <span className="material-symbols-outlined text-3xl" style={{ color: '#0c1282' }}>school</span>
-            <h1 className="text-xl font-bold tracking-tight" style={{ color: '#0c1282' }}>Academic Portal</h1>
+          <div className="md:hidden mb-10 cursor-pointer" onClick={() => navigate('/')}>
+            <img src="/diulogo.png" alt="Daffodil International University" className="h-9 w-auto" />
           </div>
 
           <div className="mb-10">

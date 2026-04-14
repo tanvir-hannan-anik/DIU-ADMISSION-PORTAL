@@ -119,10 +119,8 @@ export const RegisterPage = () => {
             }}>
 
             {/* Mobile logo */}
-            <div className="lg:hidden mb-8">
-              <h1 className="font-black text-3xl tracking-tighter" style={{ color: '#000155' }}>
-                Academic Portal
-              </h1>
+            <div className="lg:hidden mb-8 cursor-pointer" onClick={() => navigate('/')}>
+              <img src="/diulogo.png" alt="Daffodil International University" className="h-9 w-auto" />
             </div>
 
             <div className="mb-10">

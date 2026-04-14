@@ -145,9 +145,8 @@ export const SmartAdvisorFullscreen = ({
               <span className="material-symbols-outlined">menu</span>
             </div>
             <div>
-              <h2 className="text-xl font-bold tracking-tighter" style={{ color: '#0c1282' }}>
-                University Academic Portal
-              </h2>
+              <img src="/diulogo.png" alt="Daffodil International University"
+                   className="h-8 w-auto cursor-pointer mb-1" onClick={() => navigate('/')} />
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: '#3b82f6' }} />
                 <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#767684' }}>

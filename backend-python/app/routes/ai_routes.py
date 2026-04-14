@@ -73,7 +73,10 @@ def smart_advisor():
 
         messages      = data.get('messages', [])
         system_prompt = data.get('systemPrompt', 'You are Smart Advisor at DIU.')
-        max_tokens    = int(data.get('maxTokens', 512))
+        try:
+            max_tokens = max(1, min(int(data.get('maxTokens', 512)), 4096))
+        except (ValueError, TypeError):
+            max_tokens = 512
 
         if not messages:
             return jsonify({'success': False, 'message': 'messages array required'}), 400
@@ -82,6 +85,11 @@ def smart_advisor():
         if groq_svc is None:
             return jsonify({'success': False, 'message': 'AI service not configured'}), 503
 
+        advisor_client = getattr(groq_svc, 'advisor_client', None)
+        advisor_model  = getattr(groq_svc, 'advisor_model', None)
+        if advisor_client is None or advisor_model is None:
+            return jsonify({'success': False, 'message': 'Advisor client not initialised'}), 503
+
         # Build messages for Groq
         groq_messages = [{'role': 'system', 'content': system_prompt}]
         for m in messages[-12:]:                          # keep last 12 for context
@@ -89,8 +97,8 @@ def smart_advisor():
             if role in ('user', 'assistant'):
                 groq_messages.append({'role': role, 'content': m.get('content', '')})
 
-        completion = groq_svc.advisor_client.chat.completions.create(
-            model=groq_svc.advisor_model,
+        completion = advisor_client.chat.completions.create(
+            model=advisor_model,
             messages=groq_messages,
             max_tokens=max_tokens,
             temperature=0.7,

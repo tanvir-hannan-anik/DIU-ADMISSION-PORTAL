@@ -304,8 +304,8 @@ const QuickAccessCards = () => {
 
 // Static fallback department data (shown when backend has no applications yet)
 const STATIC_DEPARTMENTS = [
+  { name: 'Computer & Information Systems', short: 'CIS', visits: 5341, trend: '+27%', color: 'bg-cyan-500', trendColor: 'text-cyan-600' },
   { name: 'Computer Science & Engineering', short: 'CSE', visits: 4832, trend: '+12%', color: 'bg-blue-500', trendColor: 'text-blue-600' },
-  { name: 'Computer & Information Systems', short: 'CIS', visits: 4105, trend: '+19%', color: 'bg-cyan-500', trendColor: 'text-cyan-600' },
   { name: 'Business Administration', short: 'BBA', visits: 3621, trend: '+8%', color: 'bg-indigo-500', trendColor: 'text-indigo-600' },
   { name: 'Electrical & Electronic Eng.', short: 'EEE', visits: 2847, trend: '+15%', color: 'bg-violet-500', trendColor: 'text-violet-600' },
   { name: 'Software Engineering', short: 'SWE', visits: 2234, trend: '+22%', color: 'bg-purple-500', trendColor: 'text-purple-600' },
