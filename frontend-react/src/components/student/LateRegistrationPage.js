@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { toast } from 'react-toastify';
 import { SmartAdvisorFullscreen } from './SmartAdvisorFullscreen';
@@ -183,6 +183,7 @@ const toVisual = (s) => s <= 2 ? 1 : s === 3 ? 2 : s === 4 ? 3 : s <= 6 ? 4 : s 
 // ── Component ─────────────────────────────────────────────────────────────────
 export const LateRegistrationPage = () => {
   const navigate    = useNavigate();
+  const location    = useLocation();
   const user        = authService.getUser();
   const photo       = user ? localStorage.getItem(`diu_photo_${user.email}`) : null;
   const initials    = user?.name ? user.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : 'ST';
@@ -290,6 +291,47 @@ export const LateRegistrationPage = () => {
     }
   }, [chatOpen, greeted]);
 
+  // ── Detect return from payment page and trigger advisor sequence ─────────────
+  useEffect(() => {
+    const st = location.state;
+    if (!st?.paymentCompleted) return;
+    // Restore semester + cart
+    if (st.semester) setSelSem(st.semester);
+    if (st.courses?.length) {
+      setCart(st.courses.map(c => ({ course: c, type: c.type || 'regular' })));
+    }
+    // Mark prior approvals as done and set step to payment-verified stage
+    setDeptSt('approved');
+    setRegistrarSt('approved');
+    setAccountsSt('enabled');
+    setStep(7);
+    setGreeted(true);
+    setChatOpen(true);
+    setChatMsgs([{
+      role: 'assistant',
+      content: `✅ **Payment Confirmed!**\n\nReceipt ID: **${st.receiptId || '—'}**\nAmount Paid: **৳${Number(st.totalFee || 0).toLocaleString()}**\n\nNow checking your **Teaching Evaluations**...`,
+    }]);
+    const t1 = setTimeout(() => {
+      setStep(8);
+      setChatMsgs(p => [...p, {
+        role: 'assistant',
+        content: `📋 **Teaching Evaluation Check**\n\n✅ All course surveys submitted.\n✅ No pending evaluations found.\n\nFinalising Smart Advisor approval...`,
+      }]);
+    }, 2500);
+    const t2 = setTimeout(() => {
+      setStep(9);
+      setAdvisorSt('approved');
+      setChatMsgs(p => [...p, {
+        role: 'assistant',
+        content: `🎓 **Late Registration Approved!**\n\n✅ Dept Head: Approved\n✅ Registrar: Approved\n✅ Payment: Confirmed\n✅ Teaching Evaluations: Completed\n✅ Smart Advisor: **GRANTED**\n\nEnrolled in **${st.courses?.length || 0} course(s)** for **${st.semester}**.\nRequest ID: **${st.requestId || '—'}**\n\nCongratulations! 🎉`,
+      }]);
+      upd(st.requestId, 'completed');
+      toast.success('🎉 Late Registration Complete!');
+      setTimeout(() => setStep(10), 2000);
+    }, 5500);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // derived
   const fees      = calcFees(cart, LATE_FEE);
   const cartCodes = cart.map(c => c.course.course_code);
@@ -383,35 +425,17 @@ export const LateRegistrationPage = () => {
   }
 
   // ── Payment ────────────────────────────────────────────────────────────────
-  const handlePayment = async () => {
-    setPayLoading(true);
-    await new Promise(r => setTimeout(r, 2000));
-    setPayLoading(false);
-
-    const pmts = JSON.parse(localStorage.getItem('diu_late_payments') || '[]');
-    localStorage.setItem('diu_late_payments', JSON.stringify([...pmts, {
-      id:`LP-${Date.now().toString(36).toUpperCase()}`, requestId,
-      studentEmail: user?.email, studentName: user?.name,
-      ...fees, paidAt: new Date().toISOString(), status:'confirmed',
-    }]));
-    upd(requestId, 'paid');
-    toast.success('Payment confirmed!');
-
-    setAdvisorSt('checking'); setStep(7);
-    setChatOpen(true);
-    setChatMsgs(p => [...p, { role:'assistant', content:`🔍 Verifying payment...\n\n✅ Payment: ৳${fees.total.toLocaleString()}\n   Tuition ৳${fees.tuition.toLocaleString()} + Late fee ৳${fees.lateFee.toLocaleString()}\n\nChecking teaching evaluations...` }]);
-
-    setTimeout(() => {
-      setStep(8);
-      setChatMsgs(p => [...p, { role:'assistant', content:'📋 Teaching evaluations: All submitted.\n✅ No outstanding evaluations.\n\nFinalising approval...' }]);
-      setTimeout(() => {
-        setStep(9); setAdvisorSt('approved');
-        setChatMsgs(p => [...p, { role:'assistant', content:`🎓 LATE REGISTRATION APPROVED!\n\n✅ Dept Head · Registrar · Payment · Evaluations · Smart Advisor\n\nEnrolled in ${cart.length} course(s) for ${selSem}.\nRequest ID: ${requestId}\n\nCongratulations! 🎉` }]);
-        upd(requestId, 'completed');
-        toast.success('🎉 Late Registration Complete!');
-        setTimeout(() => setStep(10), 2000);
-      }, 4000);
-    }, 3500);
+  const handlePayment = () => {
+    navigate('/course-payment', {
+      state: {
+        type: 'late',
+        semester: selSem,
+        courses: cart.map(c => ({ ...c.course, type: c.type })),
+        totalCredits: fees.totalCr,
+        totalFee: fees.total,
+        requestId,
+      },
+    });
   };
 
   // ── Chat ──────────────────────────────────────────────────────────────────

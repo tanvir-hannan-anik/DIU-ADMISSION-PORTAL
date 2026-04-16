@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { toast } from 'react-toastify';
 import { SmartAdvisorFullscreen } from './SmartAdvisorFullscreen';
 import API_CONFIG from '../../config/apiConfig';
 import axios from 'axios';
-import { saveCourseRegistration, saveActiveEnrollment } from '../../services/studentDataService';
 
 const DIU_NOTIFICATIONS = [
   { id:1, icon:'event',         title:'Registration Deadline',     body:'Spring 2026 course registration closes April 30', time:'2h ago',  unread:true,  color:'#0c1282' },
@@ -95,6 +94,166 @@ const SEMESTER_DATA = Object.fromEntries(
 
 const ALL_COURSES = Object.values(SEMESTER_DATA).flat();
 
+// ── Prerequisite Map ──────────────────────────────────────────────────────────
+// Maps course_code → array of course_codes that MUST be completed before enrollment
+const PREREQUISITES = {
+  // Semester 2
+  'CIS122':  ['CIS115'],           // Data Structure ← Structured Programming
+  'CIS122L': ['CIS115L'],          // Data Structure Lab ← SP Lab
+  'ENG102':  ['ENG101'],           // English II ← English I
+
+  // Semester 3
+  'CIS132':  ['CIS122'],           // Algorithms ← Data Structure
+  'CIS132L': ['CIS122L'],          // Algorithms Lab ← DS Lab
+  'CIS133':  ['CIS115'],           // Website Development ← Structured Programming
+  'CIS133L': ['CIS115L'],          // Website Dev Lab ← SP Lab
+  'CIS123':  ['CIS115', 'MAT101'], // Discrete Mathematics ← SP + Mathematics-I
+
+  // Semester 4
+  'CIS232':  ['CIS122'],           // OOP ← Data Structure
+  'CIS232L': ['CIS122L'],          // OOP Lab ← DS Lab
+  'CIS211':  ['CIS131'],           // Computer Networks ← Computer Architecture
+  'CIS211L': ['CIS131'],           // Networks Lab ← Architecture
+
+  // Semester 5
+  'CIS222':  ['CIS232'],           // DBMS ← OOP
+  'CIS222L': ['CIS232L'],          // DBMS Lab ← OOP Lab
+  'CIS241':  ['CIS131'],           // Operating Systems ← Architecture
+  'CIS241L': ['CIS131'],           // OS Lab ← Architecture
+  'FIN232':  ['ACC101'],           // Financial Management ← Accounting
+
+  // Semester 6
+  'CIS323':  ['CIS222'],           // IS Architecture ← DBMS
+  'CIS323L': ['CIS222L'],          // IS Architecture Lab ← DBMS Lab
+  'CIS313':  ['CIS132'],           // Artificial Intelligence ← Algorithms
+  'CIS313L': ['CIS132L'],          // AI Lab ← Algorithms Lab
+
+  // Semester 7
+  'CIS324':  ['CIS133', 'CIS232'], // Web Engineering ← Website Dev + OOP
+  'CIS324L': ['CIS133L','CIS232L'],// Web Engineering Lab
+  'IoT336':  ['CIS211'],           // IoT & Embedded Systems ← Computer Networks
+  'IoT336L': ['CIS211L'],          // IoT Lab ← Networks Lab
+  'BI334':   ['CIS222'],           // Data Analysis ← DBMS
+
+  // Semester 8
+  'CIS414':  ['CIS323'],           // IS Management ← IS Architecture
+  'IoT429':  ['IoT336','CIS313'],  // ML for IoT ← IoT + AI
+  'CIS435':  ['CIS241','CIS211'],  // Cloud Computing ← OS + Computer Networks
+  'CIS435L': ['CIS241L','CIS211L'],// Cloud Computing Lab
+};
+
+const SEMESTER_ORDER = [
+  'Semester 1','Semester 2','Semester 3','Semester 4',
+  'Semester 5','Semester 6','Semester 7','Semester 8',
+];
+
+// Returns set of course codes "completed" — all courses in semesters BEFORE selSem
+const getCompletedCourseCodes = (currentSemester) => {
+  const idx = SEMESTER_ORDER.indexOf(currentSemester);
+  if (idx <= 0) return new Set();
+  const completed = new Set();
+  for (let i = 0; i < idx; i++) {
+    (SEMESTER_DATA[SEMESTER_ORDER[i]] || []).forEach(c => completed.add(c.course_code));
+  }
+  return completed;
+};
+
+// Returns array of missing prerequisite codes for a given course
+const getMissingPrereqs = (courseCode, completedCodes) =>
+  (PREREQUISITES[courseCode] || []).filter(p => !completedCodes.has(p));
+
+// Lookup a course's name from its code
+const findCourse = (code) => ALL_COURSES.find(c => c.course_code === code);
+
+// ── Prerequisite Error Modal ──────────────────────────────────────────────────
+const PrereqErrorModal = ({ error, onClose }) => {
+  if (!error) return null;
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+         style={{ background:'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)' }}
+         onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-fade-in" style={{ background:'white' }}>
+        {/* Header */}
+        <div className="px-6 py-5 flex items-start gap-4" style={{ background:'#fef2f2', borderBottom:'1px solid #fecaca' }}>
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background:'#fee2e2' }}>
+            <span className="material-symbols-outlined text-2xl" style={{ color:'#dc2626', fontVariationSettings:"'FILL' 1" }}>lock</span>
+          </div>
+          <div>
+            <h3 className="font-extrabold text-lg leading-tight" style={{ color:'#991b1b' }}>
+              Prerequisites Not Met
+            </h3>
+            <p className="text-sm mt-1" style={{ color:'#b91c1c' }}>
+              You cannot enroll in <strong>{error.course.course_code}</strong> yet.
+            </p>
+          </div>
+          <button onClick={onClose} className="ml-auto p-1 rounded-lg flex-shrink-0"
+            style={{ color:'#9ca3af' }}
+            onMouseEnter={e => e.currentTarget.style.background='#f3f4f6'}
+            onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
+
+        {/* Course being blocked */}
+        <div className="px-6 py-4" style={{ borderBottom:'1px solid #f3f4f6' }}>
+          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color:'#6b7280' }}>Attempted Course</p>
+          <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background:'#fef2f2', border:'1px solid #fecaca' }}>
+            <span className="material-symbols-outlined" style={{ color:'#dc2626', fontVariationSettings:"'FILL' 1" }}>block</span>
+            <div>
+              <span className="font-mono font-bold text-sm" style={{ color:'#dc2626' }}>{error.course.course_code}</span>
+              <p className="text-sm font-semibold" style={{ color:'#374151' }}>{error.course.subject}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Missing prerequisites */}
+        <div className="px-6 py-4">
+          <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color:'#6b7280' }}>
+            Missing Prerequisites ({error.missing.length})
+          </p>
+          <div className="space-y-2">
+            {error.missing.map(code => {
+              const c = findCourse(code);
+              const inSem = Object.entries(SEMESTER_DATA).find(([, cs]) => cs.some(x => x.course_code === code));
+              return (
+                <div key={code} className="flex items-center gap-3 p-3 rounded-xl" style={{ background:'#fefce8', border:'1px solid #fde68a' }}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background:'#fef08a' }}>
+                    <span className="material-symbols-outlined text-base" style={{ color:'#b45309' }}>assignment_late</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-sm" style={{ color:'#b45309' }}>{code}</span>
+                      {inSem && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                              style={{ background:'#fde68a', color:'#78350f' }}>{inSem[0]}</span>
+                      )}
+                    </div>
+                    {c && <p className="text-xs truncate" style={{ color:'#374151' }}>{c.subject}</p>}
+                  </div>
+                  <span className="material-symbols-outlined text-base flex-shrink-0" style={{ color:'#d97706' }}>warning</span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-xs mt-4 leading-relaxed" style={{ color:'#6b7280' }}>
+            Complete the prerequisite course(s) listed above before registering for <strong>{error.course.course_code}</strong>.
+            If you have already passed these via transfer or waiver, contact the registrar's office.
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4" style={{ background:'#f9fafb', borderTop:'1px solid #f3f4f6' }}>
+          <button onClick={onClose}
+            className="w-full py-3 font-bold rounded-xl transition-all active:scale-95"
+            style={{ background:'#0c1282', color:'white' }}>
+            Understood
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const STEPS = [
   { id:1, label:'Course Selection' },
   { id:2, label:'Payment'          },
@@ -145,8 +304,9 @@ async function callDeepSeek(msgs, sys) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export const CourseRegistrationPage = () => {
-  const navigate = useNavigate();
-  const user     = authService.getUser();
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const user      = authService.getUser();
   const photo    = user ? localStorage.getItem(`diu_photo_${user.email}`) : null;
   const initials = user?.name ? user.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : 'ST';
 
@@ -171,6 +331,9 @@ export const CourseRegistrationPage = () => {
   const [chatLoading, setChatLoading] = useState(false);
   const [greeted,   setGreeted]   = useState(false);
   const chatEndRef = useRef(null);
+
+  // prerequisite error modal
+  const [prereqError,   setPrereqError]   = useState(null); // { course, missing[] }
 
   // picker modal
   const [showPicker,    setShowPicker]    = useState(false);
@@ -201,13 +364,64 @@ export const CourseRegistrationPage = () => {
     }
   }, [chatOpen, greeted]);
 
-  const fees    = calcFees(cart);
+  // ── Detect return from payment page and trigger advisor sequence ─────────────
+  useEffect(() => {
+    const st = location.state;
+    if (!st?.paymentCompleted) return;
+    // Restore semester + cart
+    if (st.semester) setSelSem(st.semester);
+    if (st.courses?.length) {
+      setCart(st.courses.map(c => ({ course: c, type: c.type || 'regular' })));
+    }
+    // Kick off post-payment advisor flow
+    setPaymentDone(true);
+    setStep(2);
+    setGreeted(true);
+    setChatOpen(true);
+    setChatMsgs([{
+      role: 'assistant',
+      content: `✅ **Payment Confirmed!**\n\nReceipt ID: **${st.receiptId || '—'}**\nAmount Paid: **৳${Number(st.totalFee || 0).toLocaleString()}**\n\nNow checking your **Teaching Evaluations**...`,
+    }]);
+    const t1 = setTimeout(() => {
+      setEvalDone(true);
+      setStep(3);
+      setChatMsgs(p => [...p, {
+        role: 'assistant',
+        content: `📋 **Teaching Evaluation Check**\n\n✅ All course surveys submitted.\n✅ No pending evaluations found.\n\nFinalising Smart Advisor approval...`,
+      }]);
+    }, 2500);
+    const t2 = setTimeout(() => {
+      setApproved(true);
+      setStep(4);
+      setChatMsgs(p => [...p, {
+        role: 'assistant',
+        content: `🎓 **All Checks Passed — Registration Complete!**\n\n✅ Payment: Confirmed\n✅ Teaching Evaluations: Completed\n✅ Smart Advisor Approval: **GRANTED**\n\nYou are now enrolled in **${st.courses?.length || 0} course(s)** for **${st.semester}**.\n\nCongratulations! 🎉`,
+      }]);
+      toast.success('Registration complete! Smart Advisor approved.');
+    }, 5500);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fees      = calcFees(cart);
   const cartCodes = cart.map(c => c.course.course_code);
   const available = SEMESTER_DATA[selSem] ?? [];
+
+  // Completed courses = all courses from semesters BEFORE selSem
+  const completedCodes = getCompletedCourseCodes(selSem);
 
   const addCourse = (course, type='regular') => {
     if (cartCodes.includes(course.course_code)) { toast.warning(`${course.course_code} already added`); return; }
     if (fees.totalCr + course.credits > MAX_CREDITS) { toast.error(`Cannot exceed ${MAX_CREDITS} credits`); return; }
+
+    // Skip prereq check for retake/drop requests (student has taken the course before)
+    if (type === 'regular') {
+      const missing = getMissingPrereqs(course.course_code, completedCodes);
+      if (missing.length > 0) {
+        setPrereqError({ course, missing });
+        return;
+      }
+    }
+
     setCart(p => [...p, { course, type }]);
     toast.success(`${course.course_code} added`);
   };
@@ -240,39 +454,18 @@ export const CourseRegistrationPage = () => {
   // step labels
   const statusLabel = approved ? 'Fully Registered' : paymentDone ? 'Awaiting Approval' : cart.length ? 'Partially Registered' : 'Not Started';
 
-  const handlePayment = async () => {
-    if (!cart.length)                 { toast.error('Select at least one course');          return; }
-    if (fees.totalCr < MIN_CREDITS)   { toast.error(`Minimum ${MIN_CREDITS} credits required`); return; }
-    setPayLoading(true);
-    await new Promise(r => setTimeout(r, 2000));
-    setPaymentDone(true); setStep(2); setPayLoading(false);
-    toast.success('Payment confirmed by Accounts Department!');
-    setTimeout(() => {
-      setChatOpen(true);
-      setChatMsgs(p => [...p, { role:'assistant', content:'✅ Payment confirmed!\n\nChecking your teaching evaluations...\n\n📋 Teaching Evaluation Status: All evaluations submitted.\n\nProceeding to approval...' }]);
-      setEvalDone(true); setStep(3);
-      setTimeout(() => {
-        setChatMsgs(p => [...p, { role:'assistant', content:`🎓 All checks passed!\n\n✅ Payment: Confirmed\n✅ Teaching Evaluations: Completed\n✅ Smart Advisor Approval: GRANTED\n\nYou are now enrolled in ${cart.length} course(s). Congratulations!` }]);
-        setApproved(true); setStep(4);
-        toast.success('Registration complete! Smart Advisor approved.');
-        const enrolledCourses = cart.map(c => ({ ...c.course, type: c.type }));
-        const enrolledAt = new Date().toISOString();
-        saveCourseRegistration(user?.email, {
-          semester: selSem,
-          courses: enrolledCourses,
-          totalCredits: fees.totalCr,
-          totalFee: fees.total,
-          status: 'APPROVED',
-        });
-        saveActiveEnrollment(user?.email, {
-          semester: selSem,
-          courses: enrolledCourses,
-          totalCredits: fees.totalCr,
-          totalFee: fees.total,
-          registeredAt: enrolledAt,
-        });
-      }, 3000);
-    }, 1500);
+  const handlePayment = () => {
+    if (!cart.length)               { toast.error('Select at least one course');              return; }
+    if (fees.totalCr < MIN_CREDITS) { toast.error(`Minimum ${MIN_CREDITS} credits required`); return; }
+    navigate('/course-payment', {
+      state: {
+        type: 'course',
+        semester: selSem,
+        courses: cart.map(c => ({ ...c.course, type: c.type })),
+        totalCredits: fees.totalCr,
+        totalFee: fees.total,
+      },
+    });
   };
 
   const buildSys = () => {
@@ -318,12 +511,35 @@ FULL COURSE CATALOG (CIS Department, DIU)
 ${allSemesterInfo}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PREREQUISITE RULES (STRICTLY ENFORCED)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A student cannot register for an advanced course without completing its prerequisite(s).
+Key chains:
+  • CIS115 (SP) → CIS122 (DS) → CIS132 (Algorithms) → CIS313 (AI)
+  • CIS115 (SP) → CIS133 (Website Dev) → CIS324 (Web Engineering)
+  • CIS122 (DS) → CIS232 (OOP) → CIS222 (DBMS) → CIS323 (IS Architecture) → CIS414 (IS Mgmt)
+  • CIS131 (Arch) → CIS211 (Networks) → IoT336 (IoT) → IoT429 (ML for IoT)
+  • CIS131 (Arch) → CIS241 (OS) → CIS435 (Cloud Computing)
+  • ENG101 → ENG102 | ACC101 → FIN232
+  • IoT429 requires BOTH IoT336 AND CIS313
+  • CIS435 requires BOTH CIS241 AND CIS211
+Currently completed semesters (assumed for ${selSem}): ${
+  SEMESTER_ORDER.slice(0, SEMESTER_ORDER.indexOf(selSem)).join(', ') || 'None'
+}
+Locked courses in ${selSem}: ${
+  (SEMESTER_DATA[selSem] || [])
+    .filter(c => getMissingPrereqs(c.course_code, getCompletedCourseCodes(selSem)).length > 0)
+    .map(c => `${c.course_code} (needs ${getMissingPrereqs(c.course_code, getCompletedCourseCodes(selSem)).join(', ')})`)
+    .join('; ') || 'None — all available!'
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 YOUR ROLE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - Answer questions about any course: name, code, credits, faculty/sir name
 - Help calculate fees for any combination of courses
 - Guide the student through the 4-step registration process
-- Advise on course selection, prerequisites, and credit limits
+- Enforce prerequisite rules — if a student asks to add a locked course, explain clearly what they need to complete first
 - Be warm, friendly, and concise (<150 words unless detailed calculation needed)`;
   };
 
@@ -383,23 +599,35 @@ YOUR ROLE
                 <div className="max-h-64 overflow-y-auto">
                   {pickerList.length === 0
                     ? <p className="text-center py-6 text-sm" style={{ color:'#94a3b8' }}>No courses match "{pickerSearch}"</p>
-                    : pickerList.slice(0, 8).map(course => (
-                      <button key={course.course_code}
-                        onClick={() => { addCourse(course, 'regular'); setPickerSearch(''); setShowSearchDrop(false); }}
-                        className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors"
-                        style={{ borderBottom:'1px solid #f8fafc' }}
-                        onMouseEnter={e => e.currentTarget.style.background='#f8fafc'}
-                        onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                        <div className="min-w-0 flex-1 mr-3">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-sm font-bold" style={{ color:'#0c1282' }}>{course.course_code}</span>
-                            <span className="text-xs px-1.5 py-0.5 rounded font-bold" style={{ background:'#eff6ff', color:'#1e40af' }}>{course.credits} cr</span>
+                    : pickerList.slice(0, 8).map(course => {
+                      const missing = getMissingPrereqs(course.course_code, completedCodes);
+                      const isLocked = missing.length > 0;
+                      return (
+                        <button key={course.course_code}
+                          onClick={() => { addCourse(course, 'regular'); if (!isLocked) { setPickerSearch(''); setShowSearchDrop(false); } }}
+                          className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors"
+                          style={{ borderBottom:'1px solid #f8fafc' }}
+                          onMouseEnter={e => e.currentTarget.style.background= isLocked ? '#fff7ed' : '#f8fafc'}
+                          onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                          <div className="min-w-0 flex-1 mr-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-sm font-bold" style={{ color: isLocked ? '#dc2626' : '#0c1282' }}>{course.course_code}</span>
+                              <span className="text-xs px-1.5 py-0.5 rounded font-bold" style={{ background:'#eff6ff', color:'#1e40af' }}>{course.credits} cr</span>
+                            </div>
+                            <p className="text-xs truncate mt-0.5" style={{ color:'#64748b' }}>{course.subject}</p>
+                            {isLocked && (
+                              <p className="text-[10px] font-semibold mt-0.5" style={{ color:'#b45309' }}>
+                                Needs: {missing.join(', ')}
+                              </p>
+                            )}
                           </div>
-                          <p className="text-xs truncate mt-0.5" style={{ color:'#64748b' }}>{course.subject}</p>
-                        </div>
-                        <span className="material-symbols-outlined text-sm flex-shrink-0" style={{ color:'#94a3b8' }}>add_circle</span>
-                      </button>
-                    ))
+                          <span className="material-symbols-outlined text-sm flex-shrink-0"
+                                style={{ color: isLocked ? '#dc2626' : '#94a3b8', fontVariationSettings:"'FILL' 1" }}>
+                            {isLocked ? 'lock' : 'add_circle'}
+                          </span>
+                        </button>
+                      );
+                    })
                   }
                 </div>
                 {pickerList.length > 8 && (
@@ -742,18 +970,29 @@ YOUR ROLE
                 {/* Add more courses row */}
                 <div className="p-4 flex flex-wrap justify-center gap-2" style={{ background:'#f2f4f6' }}>
                   {available.filter(c => !cartCodes.includes(c.course_code)).length > 0 ? (
-                    available.filter(c => !cartCodes.includes(c.course_code)).slice(0, 4).map(course => (
-                      <button key={course.course_code}
-                        disabled={step > 1}
-                        onClick={() => addCourse(course)}
-                        className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg transition-all disabled:opacity-40"
-                        style={{ color:'#0c1282', background:'#eff6ff' }}
-                        onMouseEnter={e => e.currentTarget.style.background='#dbeafe'}
-                        onMouseLeave={e => e.currentTarget.style.background='#eff6ff'}>
-                        <span className="material-symbols-outlined text-sm">add_circle</span>
-                        {course.course_code}
-                      </button>
-                    ))
+                    available.filter(c => !cartCodes.includes(c.course_code)).slice(0, 4).map(course => {
+                      const missing = getMissingPrereqs(course.course_code, completedCodes);
+                      const isLocked = missing.length > 0;
+                      return (
+                        <button key={course.course_code}
+                          disabled={step > 1}
+                          onClick={() => addCourse(course)}
+                          title={isLocked ? `Requires: ${missing.join(', ')}` : `Add ${course.course_code}`}
+                          className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg transition-all disabled:opacity-40"
+                          style={{
+                            color: isLocked ? '#dc2626' : '#0c1282',
+                            background: isLocked ? '#fee2e2' : '#eff6ff',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background= isLocked ? '#fecaca' : '#dbeafe'}
+                          onMouseLeave={e => e.currentTarget.style.background= isLocked ? '#fee2e2' : '#eff6ff'}>
+                          <span className="material-symbols-outlined text-sm"
+                                style={{ fontVariationSettings:"'FILL' 1" }}>
+                            {isLocked ? 'lock' : 'add_circle'}
+                          </span>
+                          {course.course_code}
+                        </button>
+                      );
+                    })
                   ) : null}
                   <button onClick={() => { setPickerType('regular'); setPickerSearch(''); setShowPicker(true); }}
                     disabled={step > 1}
@@ -911,6 +1150,9 @@ YOUR ROLE
         </div>
       </main>
 
+      {/* ── Prerequisite Error Modal ──────────────────────────────── */}
+      <PrereqErrorModal error={prereqError} onClose={() => setPrereqError(null)} />
+
       {/* ── Course Picker Modal ───────────────────────────────────── */}
       {showPicker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -935,6 +1177,19 @@ YOUR ROLE
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>
             </div>
+            {/* Prerequisite legend */}
+            {pickerType === 'regular' && (
+              <div className="px-5 py-2 flex items-center gap-4 text-xs" style={{ background:'#f8fafc', borderBottom:'1px solid #e6e8ea' }}>
+                <div className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm" style={{ color:'#16a34a', fontVariationSettings:"'FILL' 1" }}>lock_open</span>
+                  <span style={{ color:'#374151' }}>Available</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm" style={{ color:'#dc2626', fontVariationSettings:"'FILL' 1" }}>lock</span>
+                  <span style={{ color:'#374151' }}>Prerequisites missing</span>
+                </div>
+              </div>
+            )}
             <div className="p-4" style={{ borderBottom:'1px solid #e6e8ea' }}>
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background:'#f2f4f6' }}>
                 <span className="material-symbols-outlined text-sm" style={{ color:'#464652' }}>search</span>
@@ -946,22 +1201,37 @@ YOUR ROLE
             <div className="max-h-72 overflow-y-auto custom-scrollbar">
               {pickerList.length === 0
                 ? <p className="text-center py-10 text-sm" style={{ color:'#767684' }}>No courses found</p>
-                : pickerList.map(course => (
-                  <button key={course.course_code}
-                    onClick={() => { addCourse(course, pickerType); setShowPicker(false); }}
-                    className="w-full flex items-center justify-between px-5 py-3.5 text-left transition-colors"
-                    style={{ borderBottom:'1px solid #f2f4f6' }}
-                    onMouseEnter={e => e.currentTarget.style.background='#f7f9fb'}
-                    onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                    <div className="min-w-0 mr-3">
-                      <span className="font-mono text-sm font-bold" style={{ color:'#0c1282' }}>{course.course_code}</span>
-                      <p className="text-sm truncate" style={{ color:'#191c1e' }}>{course.subject}</p>
-                    </div>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded shrink-0" style={{ background:'#f2f4f6', color:'#464652' }}>
-                      {course.credits} cr
-                    </span>
-                  </button>
-                ))
+                : pickerList.map(course => {
+                  const missing = pickerType === 'regular' ? getMissingPrereqs(course.course_code, completedCodes) : [];
+                  const isLocked = missing.length > 0;
+                  return (
+                    <button key={course.course_code}
+                      onClick={() => { addCourse(course, pickerType); if (!isLocked) setShowPicker(false); }}
+                      className="w-full flex items-center justify-between px-5 py-3.5 text-left transition-colors"
+                      style={{ borderBottom:'1px solid #f2f4f6', opacity: isLocked ? 0.75 : 1 }}
+                      onMouseEnter={e => e.currentTarget.style.background= isLocked ? '#fff7ed' : '#f7f9fb'}
+                      onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                      <div className="min-w-0 mr-3 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-sm font-bold" style={{ color: isLocked ? '#dc2626' : '#0c1282' }}>{course.course_code}</span>
+                          <span className="text-xs font-bold px-2 py-0.5 rounded shrink-0" style={{ background:'#f2f4f6', color:'#464652' }}>
+                            {course.credits} cr
+                          </span>
+                        </div>
+                        <p className="text-sm truncate" style={{ color:'#191c1e' }}>{course.subject}</p>
+                        {isLocked && (
+                          <p className="text-[11px] mt-0.5 font-semibold" style={{ color:'#b45309' }}>
+                            Requires: {missing.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                      <span className="material-symbols-outlined text-base flex-shrink-0 ml-2"
+                            style={{ color: isLocked ? '#dc2626' : '#16a34a', fontVariationSettings:"'FILL' 1" }}>
+                        {isLocked ? 'lock' : 'lock_open'}
+                      </span>
+                    </button>
+                  );
+                })
               }
             </div>
           </div>

@@ -15,6 +15,7 @@ import { RegisterPage }           from './components/auth/RegisterPage';
 import { SetPasswordPage }        from './components/auth/SetPasswordPage';
 import { CourseRegistrationPage } from './components/student/CourseRegistrationPage';
 import { LateRegistrationPage }   from './components/student/LateRegistrationPage';
+import { CoursePaymentPage }      from './components/student/CoursePaymentPage';
 import { ProfilePage }            from './components/student/ProfilePage';
 import { FacilitiesPage }         from './components/facilities/FacilitiesPage';
 import { FacultyPage }            from './components/faculty/FacultyPage';
@@ -60,6 +61,7 @@ function App() {
           {/* Protected student routes */}
           <Route path="/course-registration" element={<ProtectedRoute><CourseRegistrationPage /></ProtectedRoute>} />
           <Route path="/late-registration"   element={<ProtectedRoute><LateRegistrationPage /></ProtectedRoute>} />
+          <Route path="/course-payment"      element={<ProtectedRoute><CoursePaymentPage /></ProtectedRoute>} />
           <Route path="/profile"             element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
           {/* Info pages */}
