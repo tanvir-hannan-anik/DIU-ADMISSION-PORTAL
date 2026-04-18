@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom'; // Online Admission Portal
 import { Navigation } from '../common/Navigation';
 import { Footer } from '../common/Footer';
@@ -269,45 +269,59 @@ export const OnlineAdmitPage = () => {
     }
   };
 
-  // Load chatbot-collected data if available
-  useEffect(() => {
-    const chatbotData = JSON.parse(localStorage.getItem('chatbot_admit_data') || 'null');
-    if (chatbotData) {
-      setPersonal(prev => ({
-        ...prev,
-        fullName:    chatbotData.fullName    || prev.fullName,
-        fatherName:  chatbotData.fatherName  || '',
-        motherName:  chatbotData.motherName  || '',
-        dob:         chatbotData.dob         || '',
-        gender:      chatbotData.gender      || '',
-        phone:       chatbotData.phone       || prev.phone,
-        email:       chatbotData.email       || prev.email,
-      }));
-      setAddress(prev => ({
-        ...prev,
-        presentDistrict: chatbotData.presentDistrict || '',
-        presentDivision: chatbotData.presentDivision || '',
-      }));
-      setAcademic(prev => ({
-        ...prev,
-        sscBoard: chatbotData.sscBoard || '',
-        sscYear:  chatbotData.sscYear  || '',
-        sscGroup: chatbotData.sscGroup || '',
-        sscGpa:   chatbotData.sscGpa   || '',
-        hscBoard: chatbotData.hscBoard || '',
-        hscYear:  chatbotData.hscYear  || '',
-        hscGroup: chatbotData.hscGroup || '',
-        hscGpa:   chatbotData.hscGpa   || '',
-      }));
-      setProgram(prev => ({
-        ...prev,
-        programName: chatbotData.programName || prev.programName,
-      }));
-      localStorage.removeItem('chatbot_admit_data');
-      toast.success('Form pre-filled by AI Assistant! Upload documents to complete.', { icon: '🤖' });
-    }
+  // Apply chatbot-collected data and auto-advance to address step (step 2)
+  const applyChatbotAdmitData = useCallback((chatbotData) => {
+    if (!chatbotData) return;
+    setPersonal(prev => ({
+      ...prev,
+      fullName:    chatbotData.fullName    || prev.fullName,
+      fatherName:  chatbotData.fatherName  || '',
+      motherName:  chatbotData.motherName  || '',
+      dob:         chatbotData.dob         || '',
+      gender:      chatbotData.gender      || '',
+      phone:       chatbotData.phone       || prev.phone,
+      email:       chatbotData.email       || prev.email,
+    }));
+    setAddress(prev => ({
+      ...prev,
+      presentDistrict: chatbotData.presentDistrict || '',
+      presentDivision: chatbotData.presentDivision || '',
+    }));
+    setAcademic(prev => ({
+      ...prev,
+      sscBoard: chatbotData.sscBoard || '',
+      sscYear:  chatbotData.sscYear  || '',
+      sscGroup: chatbotData.sscGroup || '',
+      sscGpa:   chatbotData.sscGpa   || '',
+      hscBoard: chatbotData.hscBoard || '',
+      hscYear:  chatbotData.hscYear  || '',
+      hscGroup: chatbotData.hscGroup || '',
+      hscGpa:   chatbotData.hscGpa   || '',
+    }));
+    setProgram(prev => ({
+      ...prev,
+      programName: chatbotData.programName || prev.programName,
+    }));
+    localStorage.removeItem('chatbot_admit_data');
+    // Personal info (step 1) is filled — advance to address (step 2)
+    setStep(2);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    toast.success('Form auto-filled by AI! Complete the remaining address and document fields.', { icon: '🤖' });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    // Check localStorage on mount (navigated from another page)
+    const saved = JSON.parse(localStorage.getItem('chatbot_admit_data') || 'null');
+    if (saved) applyChatbotAdmitData(saved);
+
+    // Listen for real-time event (chatbot used on this same page)
+    const handler = (e) => {
+      if (e.detail?.form === 'online-admit') applyChatbotAdmitData(e.detail.data);
+    };
+    window.addEventListener('chatbot-form-fill', handler);
+    return () => window.removeEventListener('chatbot-form-fill', handler);
+  }, [applyChatbotAdmitData]);
 
   // ── Dashboard handlers ──
   const triggerDashUpload = (docId) => { setDashTarget(docId); dashFileRef.current.click(); };

@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 import logging
 from app.services.groq_service import GroqService
+from app.config.settings import Config
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('ai', __name__, url_prefix='/api/v1/ai')
@@ -108,6 +109,113 @@ def smart_advisor():
 
     except Exception as e:
         logger.error(f'Smart Advisor error: {e}')
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@bp.route('/smart-proctor', methods=['POST'])
+def smart_proctor():
+    """Smart Proctor chatbot endpoint — uses Groq API key 3."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Request body required'}), 400
+
+        messages      = data.get('messages', [])
+        system_prompt = data.get('systemPrompt', 'You are a Smart Proctor Assistant at DIU.')
+        try:
+            max_tokens = max(1, min(int(data.get('maxTokens', 1024)), 4096))
+        except (ValueError, TypeError):
+            max_tokens = 1024
+
+        if not messages:
+            return jsonify({'success': False, 'message': 'messages array required'}), 400
+
+        groq_svc = get_groq_service()
+        if groq_svc is None:
+            return jsonify({'success': False, 'message': 'AI service not configured'}), 503
+
+        proctor_client = getattr(groq_svc, 'proctor_client', None)
+        proctor_model  = getattr(groq_svc, 'proctor_model', None)
+        if proctor_client is None or proctor_model is None:
+            return jsonify({'success': False, 'message': 'Proctor client not initialised'}), 503
+
+        groq_messages = [{'role': 'system', 'content': system_prompt}]
+        for m in messages[-16:]:
+            role = m.get('role', 'user')
+            if role in ('user', 'assistant'):
+                groq_messages.append({'role': role, 'content': m.get('content', '')})
+
+        completion = proctor_client.chat.completions.create(
+            model=proctor_model,
+            messages=groq_messages,
+            max_tokens=max_tokens,
+            temperature=0.7,
+        )
+        reply = completion.choices[0].message.content
+        return jsonify({'success': True, 'reply': reply}), 200
+
+    except Exception as e:
+        logger.error(f'Smart Proctor error: {e}')
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@bp.route('/vision', methods=['POST'])
+def vision_analysis():
+    """Analyze images using Groq vision model (llama-4-scout). Works for all chatbots."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Request body required'}), 400
+
+        messages      = data.get('messages', [])
+        system_prompt = data.get('systemPrompt', 'You are a helpful AI assistant.')
+        image_b64     = data.get('imageBase64', '')
+        try:
+            max_tokens = max(1, min(int(data.get('maxTokens', 1024)), 4096))
+        except (ValueError, TypeError):
+            max_tokens = 1024
+
+        if not image_b64:
+            return jsonify({'success': False, 'message': 'imageBase64 (data URL) required'}), 400
+
+        groq_svc = get_groq_service()
+        if groq_svc is None:
+            return jsonify({'success': False, 'message': 'AI service not configured'}), 503
+
+        # Use proctor_client (key 3) → advisor_client (key 2) → main client (key 1)
+        vision_client = (
+            getattr(groq_svc, 'proctor_client', None)
+            or getattr(groq_svc, 'advisor_client', None)
+            or getattr(groq_svc, 'client', None)
+        )
+        vision_model = Config.GROQ_VISION_MODEL
+
+        groq_messages = [{'role': 'system', 'content': system_prompt}]
+        for m in messages[:-1]:
+            role = m.get('role', 'user')
+            if role in ('user', 'assistant'):
+                groq_messages.append({'role': role, 'content': m.get('content', '')})
+
+        last_text = messages[-1].get('content', 'Please analyze this image.') if messages else 'Please analyze this image.'
+        groq_messages.append({
+            'role': 'user',
+            'content': [
+                {'type': 'text', 'text': last_text},
+                {'type': 'image_url', 'image_url': {'url': image_b64}},
+            ],
+        })
+
+        completion = vision_client.chat.completions.create(
+            model=vision_model,
+            messages=groq_messages,
+            max_tokens=max_tokens,
+            temperature=0.7,
+        )
+        reply = completion.choices[0].message.content
+        return jsonify({'success': True, 'reply': reply}), 200
+
+    except Exception as e:
+        logger.error(f'Vision analysis error: {e}')
         return jsonify({'success': False, 'message': str(e)}), 500
 
 

@@ -14,6 +14,8 @@ class Config:
     GROQ_VISION_MODEL = os.getenv('GROQ_VISION_MODEL', 'meta-llama/llama-4-scout-17b-16e-instruct')
     GROQ_API_KEY_2 = os.getenv('GROQ_API_KEY_2')
     GROQ_MODEL_2 = os.getenv('GROQ_MODEL_2', 'llama-3.3-70b-versatile')
+    GROQ_API_KEY_3 = os.getenv('GROQ_API_KEY_3')
+    GROQ_MODEL_3 = os.getenv('GROQ_MODEL_3', 'llama-3.3-70b-versatile')
     FLASK_ENV = os.getenv('FLASK_ENV', 'development')
     SERVICE_HOST = os.getenv('SERVICE_HOST', '0.0.0.0')
     SERVICE_PORT = int(os.getenv('PORT', os.getenv('SERVICE_PORT', '5000')))

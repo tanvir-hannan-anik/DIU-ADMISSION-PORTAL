@@ -17,6 +17,7 @@ const CLUBS = [
     members: 184, active: true,
     type: 'dark',
     progress: 75,
+    cardColor: '#2563eb',
   },
   {
     name: 'Creative Studio', icon: 'palette',
@@ -52,6 +53,7 @@ const CLUBS = [
     members: 135,
     type: 'dark',
     progress: 55,
+    cardColor: '#2563eb',
   },
   {
     name: 'Debate & Model UN', icon: 'record_voice_over',
@@ -87,6 +89,7 @@ const CLUBS = [
     members: 95,
     type: 'dark',
     progress: 40,
+    cardColor: '#2563eb',
   },
   {
     name: 'Language & Literature', icon: 'translate',
@@ -251,10 +254,10 @@ const LargeCard = ({ club }) => (
 
 const DarkCard = ({ club }) => (
   <div className="md:col-span-4 group cursor-pointer">
-    <div className="h-full bg-primary-container rounded-xl p-10 text-white flex flex-col justify-between shadow-[0px_12px_32px_rgba(0,30,180,0.15)] transition-all duration-300 hover:-translate-y-2">
+    <div className="h-full rounded-xl p-10 text-white flex flex-col justify-between shadow-[0px_12px_32px_rgba(0,30,180,0.15)] transition-all duration-300 hover:-translate-y-2" style={{ backgroundColor: '#001eb4' }}>
       <div>
         <div className="w-16 h-16 bg-white/20 backdrop-blur-xl flex items-center justify-center rounded-xl mb-12">
-          <span className="material-symbols-outlined text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>{club.icon}</span>
+          <span className="material-symbols-outlined text-4xl text-on-primary-container" style={{ fontVariationSettings: "'FILL' 1" }}>{club.icon}</span>
         </div>
         <h3 className="text-3xl font-bold mb-4 tracking-tight">{club.name}</h3>
         <p className="text-on-primary-container/80 leading-relaxed mb-8">{club.desc}</p>
@@ -622,115 +625,145 @@ export const FacilitiesPage = () => {
 
         {/* ── Hostel ── */}
         {activeTab === 'hostel' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-6 space-y-8">
-              <div className="bg-surface-container-lowest rounded-xl p-10 shadow-sm transition-all duration-300 hover:shadow-xl group">
-                <div className="flex items-center justify-between mb-12">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-xl bg-primary/5 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-4xl text-primary">apartment</span>
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Boys Hostel */}
+              <div className="lg:col-span-6 space-y-8">
+                <div className="bg-surface-container-lowest rounded-xl p-10 shadow-sm transition-all duration-300 hover:shadow-xl group">
+                  <div className="flex items-center justify-between mb-12">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-xl bg-primary/5 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-4xl text-primary">apartment</span>
+                      </div>
+                      <div>
+                        <h2 className="text-3xl font-bold tracking-tight text-on-surface">Boys Hostel</h2>
+                        <p className="text-on-surface-variant/60 font-medium">Ashulia Campus</p>
+                      </div>
+                    </div>
+                    <span className="text-primary font-bold text-4xl opacity-10 group-hover:opacity-100 transition-opacity">01</span>
+                  </div>
+                  <div className="space-y-12">
+                    <div>
+                      <h3 className="text-xs uppercase tracking-[0.2em] text-primary mb-6 font-bold">Residential Gardens</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {HOSTELS[0].halls.map((hall, i) => (
+                          <div key={hall.name} className="p-6 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors">
+                            <p className="font-bold text-lg mb-1">{hall.name}</p>
+                            <p className="text-sm text-on-surface-variant">
+                              {['Undergraduate Residence', 'Post-Graduate Wing', 'International Hub'][i] || 'Residential Wing'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                     <div>
-                      <h2 className="text-3xl font-bold tracking-tight text-on-surface">Boys Hostel</h2>
-                      <p className="text-on-surface-variant/60 font-medium">Ashulia Campus</p>
+                      <h3 className="text-xs uppercase tracking-[0.2em] text-primary mb-6 font-bold">Exclusive Amenities</h3>
+                      <ul className="space-y-4">
+                        {HOSTELS[0].features.map((f, i) => {
+                          const icons = ['fitness_center','sports_esports','local_dining','laundry','security','wifi'];
+                          return (
+                            <li key={f} className="flex items-center gap-4 text-on-surface-variant">
+                              <span className="material-symbols-outlined text-secondary">{icons[i] || 'check_circle'}</span>
+                              <span className="font-medium">{f}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
                     </div>
                   </div>
-                  <span className="text-primary font-bold text-4xl opacity-10 group-hover:opacity-100 transition-opacity">01</span>
                 </div>
-                <div className="space-y-12">
-                  <div>
-                    <h3 className="text-xs uppercase tracking-[0.2em] text-primary mb-6 font-bold">Residential Gardens</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {HOSTELS[0].halls.map((hall, i) => (
-                        <div key={hall.name} className="p-6 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors">
-                          <p className="font-bold text-lg mb-1">{hall.name}</p>
-                          <p className="text-sm text-on-surface-variant">
-                            {['Undergraduate Residence', 'Post-Graduate Wing', 'International Hub'][i] || 'Residential Wing'}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
+                <div className="relative h-64 rounded-xl overflow-hidden shadow-sm">
+                  <div className="w-full h-full bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center">
+                    <span className="material-symbols-outlined text-white/20" style={{ fontSize: '120px', fontVariationSettings: "'FILL' 1" }}>apartment</span>
                   </div>
-                  <div>
-                    <h3 className="text-xs uppercase tracking-[0.2em] text-primary mb-6 font-bold">Exclusive Amenities</h3>
-                    <ul className="space-y-4">
-                      {HOSTELS[0].features.map((f, i) => {
-                        const icons = ['fitness_center','sports_esports','local_dining','laundry','security','wifi'];
-                        return (
-                          <li key={f} className="flex items-center gap-4 text-on-surface-variant">
-                            <span className="material-symbols-outlined text-secondary">{icons[i] || 'check_circle'}</span>
-                            <span className="font-medium">{f}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                  <div className="absolute inset-0 bg-gradient-to-t from-primary/80 to-transparent flex items-end p-8">
+                    <p className="text-white font-bold text-xl">Integrated Study Spaces</p>
                   </div>
                 </div>
               </div>
-              <div className="relative h-64 rounded-xl overflow-hidden shadow-sm">
-                <div className="w-full h-full bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center">
-                  <span className="material-symbols-outlined text-white/20" style={{ fontSize: '120px', fontVariationSettings: "'FILL' 1" }}>apartment</span>
+
+              {/* Girls Hostel */}
+              <div className="lg:col-span-6 space-y-8 lg:mt-16">
+                <div className="bg-surface-container-lowest rounded-xl p-10 shadow-sm transition-all duration-300 hover:shadow-xl group">
+                  <div className="flex items-center justify-between mb-12">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-xl bg-primary/5 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-4xl text-primary">domain</span>
+                      </div>
+                      <div>
+                        <h2 className="text-3xl font-bold tracking-tight text-on-surface">Girls Hostel</h2>
+                        <p className="text-on-surface-variant/60 font-medium">Ashulia Campus</p>
+                      </div>
+                    </div>
+                    <span className="text-primary font-bold text-4xl opacity-10 group-hover:opacity-100 transition-opacity">02</span>
+                  </div>
+                  <div className="space-y-12">
+                    <div>
+                      <h3 className="text-xs uppercase tracking-[0.2em] text-primary mb-6 font-bold">Residential Gardens</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {HOSTELS[1].halls.map((hall, i) => (
+                          <div key={hall.name} className="p-6 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors">
+                            <p className="font-bold text-lg mb-1">{hall.name}</p>
+                            <p className="text-sm text-on-surface-variant">
+                              {['Undergraduate Residence', 'Post-Graduate Wing', 'International Hub'][i] || 'Residential Wing'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-xs uppercase tracking-[0.2em] text-primary mb-6 font-bold">Exclusive Amenities</h3>
+                      <ul className="space-y-4">
+                        {HOSTELS[1].features.map((f, i) => {
+                          const icons = ['female','menu_book','local_dining','security','supervisor_account','self_improvement'];
+                          return (
+                            <li key={f} className="flex items-center gap-4 text-on-surface-variant">
+                              <span className="material-symbols-outlined text-secondary">{icons[i] || 'check_circle'}</span>
+                              <span className="font-medium">{f}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-primary/80 to-transparent flex items-end p-8">
-                  <p className="text-white font-bold text-xl">Integrated Study Spaces</p>
+                {/* Bento feature cards */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-primary-container p-8 rounded-xl flex flex-col justify-between min-h-[160px]">
+                    <span className="material-symbols-outlined text-white text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>security</span>
+                    <div>
+                      <p className="text-white font-bold text-lg">Biometric Security</p>
+                      <p className="text-on-primary-container/70 text-xs mt-1">Dual-factor authentication for maximum safety.</p>
+                    </div>
+                  </div>
+                  <div className="bg-secondary-container p-8 rounded-xl flex flex-col justify-between min-h-[160px]">
+                    <span className="material-symbols-outlined text-on-secondary-container text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>wifi_tethering</span>
+                    <div>
+                      <p className="text-on-secondary-container font-bold text-lg">Gigabit Fiber</p>
+                      <p className="text-on-secondary-container/60 text-xs mt-1">High-speed connectivity across every room.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="lg:col-span-6 space-y-8 lg:mt-16">
-              <div className="bg-surface-container-lowest rounded-xl p-10 shadow-sm transition-all duration-300 hover:shadow-xl group">
-                <div className="flex items-center justify-between mb-12">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-xl bg-primary/5 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-4xl text-primary">domain</span>
-                    </div>
-                    <div>
-                      <h2 className="text-3xl font-bold tracking-tight text-on-surface">Girls Hostel</h2>
-                      <p className="text-on-surface-variant/60 font-medium">Ashulia Campus</p>
-                    </div>
+            {/* Stats row */}
+            <section className="-mx-6 md:-mx-8 px-6 md:px-8 py-20 mt-16 bg-surface-container-low">
+              <div className="max-w-screen-2xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
+                {[
+                  { value: '2400+', label: 'Student Capacity' },
+                  { value: '100%',  label: 'Secure Perimeter' },
+                  { value: '6',     label: 'Residential Blocks' },
+                  { value: '24/7',  label: 'Medical Support' },
+                ].map(s => (
+                  <div key={s.label}>
+                    <p className="text-5xl font-black text-primary mb-2">{s.value}</p>
+                    <p className="text-sm font-bold uppercase tracking-widest text-on-surface-variant/50">{s.label}</p>
                   </div>
-                  <span className="text-primary font-bold text-4xl opacity-10 group-hover:opacity-100 transition-opacity">02</span>
-                </div>
-                <div className="space-y-12">
-                  <div>
-                    <h3 className="text-xs uppercase tracking-[0.2em] text-primary mb-6 font-bold">Residential Gardens</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {HOSTELS[1].halls.map((hall, i) => (
-                        <div key={hall.name} className="p-6 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors">
-                          <p className="font-bold text-lg mb-1">{hall.name}</p>
-                          <p className="text-sm text-on-surface-variant">
-                            {['Undergraduate Residence', 'Post-Graduate Wing', 'International Hub'][i] || 'Residential Wing'}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-xs uppercase tracking-[0.2em] text-primary mb-6 font-bold">Exclusive Amenities</h3>
-                    <ul className="space-y-4">
-                      {HOSTELS[1].features.map((f, i) => {
-                        const icons = ['female','menu_book','local_dining','security','supervisor_account','self_improvement'];
-                        return (
-                          <li key={f} className="flex items-center gap-4 text-on-surface-variant">
-                            <span className="material-symbols-outlined text-secondary">{icons[i] || 'check_circle'}</span>
-                            <span className="font-medium">{f}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                </div>
+                ))}
               </div>
-              <div className="relative h-64 rounded-xl overflow-hidden shadow-sm">
-                <div className="w-full h-full bg-gradient-to-br from-pink-700 to-rose-900 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-white/20" style={{ fontSize: '120px', fontVariationSettings: "'FILL' 1" }}>domain</span>
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-primary/80 to-transparent flex items-end p-8">
-                  <p className="text-white font-bold text-xl">Safe & Comfortable Living</p>
-                </div>
-              </div>
-            </div>
-          </div>
+            </section>
+          </>
         )}
 
         {/* ── Library ── */}

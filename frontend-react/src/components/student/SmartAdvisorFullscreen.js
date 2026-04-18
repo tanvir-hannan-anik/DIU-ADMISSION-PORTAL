@@ -1,20 +1,13 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
+import { readFileForChat, getFileIcon, analyzeImageWithVision } from '../../utils/fileReader';
 
 /**
- * SmartAdvisorFullscreen
- * Full-page Smart Advisor overlay — matching the Academic Portal AI reference design.
- *
+ * SmartAdvisorFullscreen — Full-page Smart Advisor overlay.
  * Props:
- *   onClose       () => void   — called when user closes fullscreen
- *   onClearChat   () => void   — called when user clears the chat
- *   chatMsgs      array        — message objects { role, content }
- *   chatInput     string
- *   setChatInput  setter
- *   chatLoading   boolean
- *   sendChat      () => void
- *   quickChips    string[]     — quick prompt chips
+ *   onClose, onClearChat, chatMsgs, chatInput, setChatInput,
+ *   chatLoading, sendChat, sendMessage (optional direct-text fn), quickChips
  */
 export const SmartAdvisorFullscreen = ({
   onClose,
@@ -24,6 +17,7 @@ export const SmartAdvisorFullscreen = ({
   setChatInput,
   chatLoading,
   sendChat,
+  sendMessage,
   quickChips = [],
 }) => {
   const navigate  = useNavigate();
@@ -31,19 +25,71 @@ export const SmartAdvisorFullscreen = ({
   const photo     = user ? localStorage.getItem(`diu_photo_${user.email}`) : null;
   const initials  = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'ST';
   const messagesEndRef = useRef(null);
+  const fileInputRef   = useRef(null);
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [fileError, setFileError]       = useState('');
+  const [fileLoading, setFileLoading]   = useState(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMsgs]);
 
-  // Prevent background scroll while fullscreen is open
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
 
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileError('');
+    try {
+      const result = await readFileForChat(file);
+      setAttachedFile({ ...result, originalFile: file });
+    } catch (err) {
+      setFileError(err.message);
+    }
+    e.target.value = '';
+  };
+
+  const handleSend = async () => {
+    const baseText = chatInput.trim();
+    if (!attachedFile) { sendChat(); return; }
+
+    if (attachedFile.type === 'text') {
+      const fullText = (baseText ? baseText + '\n\n' : '') +
+        `Attached document "${attachedFile.name}":\n\n${attachedFile.content}`;
+      setAttachedFile(null);
+      if (sendMessage) {
+        setChatInput('');
+        sendMessage(fullText);
+      } else {
+        setChatInput(fullText);
+        setTimeout(() => sendChat(), 50);
+      }
+    } else if (attachedFile.type === 'image') {
+      const msgText = baseText || `Please analyze this image: ${attachedFile.name}`;
+      const dataUrl = attachedFile.dataUrl;
+      setAttachedFile(null);
+      setChatInput('');
+      setFileLoading(true);
+      try {
+        const ADVISOR_SYS = 'You are a helpful AI academic advisor for DIU. Analyze the attached image and answer any student questions in the context of academics or career guidance.';
+        const reply = await analyzeImageWithVision(
+          [{ role: 'user', content: msgText }], ADVISOR_SYS, dataUrl
+        );
+        if (sendMessage) sendMessage(`[Image: ${attachedFile.name}]\n\n${reply}`);
+        else if (sendChat) { setChatInput(`[Image analyzed]: ${reply.slice(0, 200)}...`); setTimeout(() => sendChat(), 50); }
+      } catch {
+        if (sendMessage) sendMessage('Could not analyze the image. Please try again.');
+      } finally {
+        setFileLoading(false);
+      }
+    }
+  };
+
   const handleKey = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
   const clearChat = () => {
@@ -339,29 +385,67 @@ export const SmartAdvisorFullscreen = ({
         </div>
 
         {/* Footer — input */}
-        <footer className="p-6 shrink-0"
+        <footer className="px-6 pt-4 pb-6 shrink-0"
           style={{ backgroundColor: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(24px)', borderTop: '1px solid rgba(226,232,240,0.5)' }}>
+
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.txt,.md,.csv,.json,.js,.ts,.jsx,.tsx,.py,.html,.css,.xml,.log,.java,.c,.cpp,.pdf,.yaml,.yml,.sql"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
+
+          {/* File chip */}
+          {attachedFile && (
+            <div className="max-w-4xl mx-auto mb-3 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold w-fit"
+              style={{ backgroundColor: '#e0e0ff', color: '#000155', border: '1px solid #bec2ff' }}>
+              {attachedFile.type === 'image' ? (
+                <img src={attachedFile.dataUrl} alt="preview" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+              ) : (
+                <span className="material-symbols-outlined text-base flex-shrink-0"
+                  style={{ fontVariationSettings: "'FILL' 1", color: '#0c1282' }}>
+                  {getFileIcon(attachedFile.name)}
+                </span>
+              )}
+              <span className="max-w-[200px] truncate">{attachedFile.name}</span>
+              <button
+                onClick={() => setAttachedFile(null)}
+                className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center hover:bg-black/10 transition-colors ml-1"
+                title="Remove file"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>close</span>
+              </button>
+            </div>
+          )}
+
+          {/* Error */}
+          {fileError && (
+            <p className="max-w-4xl mx-auto mb-2 text-xs font-semibold" style={{ color: '#ba1a1a' }}>{fileError}</p>
+          )}
+
           <div className="max-w-4xl mx-auto flex items-center gap-4">
             <div className="flex-1 relative flex items-center">
               {/* Attach */}
-              <button className="absolute left-4 p-2 transition-colors"
-                style={{ color: '#9ca3af' }}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute left-4 p-2 transition-colors"
+                style={{ color: attachedFile ? '#0c1282' : '#9ca3af' }}
                 onMouseEnter={e => e.currentTarget.style.color = '#0c1282'}
-                onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}>
-                <span className="material-symbols-outlined">attach_file</span>
+                onMouseLeave={e => e.currentTarget.style.color = attachedFile ? '#0c1282' : '#9ca3af'}
+                title="Attach file">
+                <span className="material-symbols-outlined"
+                  style={{ fontVariationSettings: attachedFile ? "'FILL' 1" : "'FILL' 0" }}>attach_file</span>
               </button>
 
               <input
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
                 onKeyDown={handleKey}
-                placeholder="Inquire about course planning, career advice, or grants..."
+                placeholder={attachedFile ? 'Add a message (optional)…' : 'Inquire about course planning, career advice, or grants...'}
                 className="w-full py-4 pl-14 pr-20 rounded-full text-sm outline-none font-medium transition-all"
-                style={{
-                  backgroundColor: '#e6e8ea',
-                  border: 'none',
-                  color: '#191c1e',
-                }}
+                style={{ backgroundColor: '#e6e8ea', border: 'none', color: '#191c1e' }}
                 onFocus={e => e.currentTarget.style.boxShadow = '0 0 0 2px rgba(12,18,130,0.2)'}
                 onBlur={e => e.currentTarget.style.boxShadow = 'none'}
               />
@@ -375,11 +459,13 @@ export const SmartAdvisorFullscreen = ({
                   <span className="material-symbols-outlined">mic</span>
                 </button>
                 <button
-                  onClick={sendChat}
-                  disabled={chatLoading || !chatInput.trim()}
+                  onClick={handleSend}
+                  disabled={(chatLoading || fileLoading) || (!chatInput.trim() && !attachedFile)}
                   className="p-2 rounded-full text-white shadow-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-40"
                   style={{ backgroundColor: '#0c1282' }}>
-                  <span className="material-symbols-outlined text-lg">send</span>
+                  <span className="material-symbols-outlined text-lg">
+                    {fileLoading ? 'hourglass_empty' : 'send'}
+                  </span>
                 </button>
               </div>
             </div>

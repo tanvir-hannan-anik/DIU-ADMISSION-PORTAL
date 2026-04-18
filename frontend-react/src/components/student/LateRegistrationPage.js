@@ -493,8 +493,8 @@ YOUR ROLE
 - Be warm, friendly, and concise (<150 words unless detailed calculation needed)`;
   };
 
-  const sendChat = async () => {
-    const text = chatInput.trim(); if (!text || chatLoading) return;
+  const sendChatText = async (text) => {
+    if (!text || chatLoading) return;
     const updated = [...chatMsgs, { role:'user', content:text }];
     setChatMsgs(updated); setChatInput(''); setChatLoading(true);
     try {
@@ -506,6 +506,7 @@ YOUR ROLE
     }
     setChatLoading(false);
   };
+  const sendChat = () => sendChatText(chatInput.trim());
 
   const pickerList = allCourses.filter(c =>
     !cartCodes.includes(c.course_code) &&
@@ -1429,6 +1430,7 @@ YOUR ROLE
           setChatInput={setChatInput}
           chatLoading={chatLoading}
           sendChat={sendChat}
+          sendMessage={sendChatText}
           quickChips={['Can I register?', 'Late fee?', 'Approval status?', 'My credits?']}
         />
       )}

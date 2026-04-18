@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAI } from '../../hooks/useAI';
+import { readFileForChat, getFileIcon, analyzeImageWithVision } from '../../utils/fileReader';
 
 // ── Field definitions ──────────────────────────────────────────────
 const BOARDS = ['Dhaka','Chittagong','Rajshahi','Sylhet','Barisal','Comilla','Jessore','Dinajpur','Mymensingh'];
@@ -169,29 +170,100 @@ const MessageList = ({ messages, isLoading, messagesEndRef }) => (
 );
 
 // ── Chat input ─────────────────────────────────────────────────────
-const ChatInput = ({ inputValue, setInputValue, isLoading, handleSubmit, autoFocus, placeholder }) => (
-  <form onSubmit={handleSubmit} className="p-4 border-t border-outline-variant/20 flex gap-2 bg-white">
-    <input
-      type="text"
-      value={inputValue}
-      onChange={(e) => setInputValue(e.target.value)}
-      placeholder={placeholder || "Ask about admissions, programs, fees..."}
-      disabled={isLoading}
-      autoFocus={autoFocus}
-      className="flex-1 px-4 py-2.5 bg-surface-container-low border border-outline-variant/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
-    />
-    <button
-      type="submit"
-      disabled={isLoading || !inputValue.trim()}
-      className="w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center hover:bg-primary/90 disabled:opacity-40 transition-all flex-shrink-0"
-    >
-      <span className="material-symbols-outlined text-base">send</span>
-    </button>
-  </form>
-);
+const ChatInput = ({ inputValue, setInputValue, isLoading, handleSubmitWithFile, autoFocus, placeholder }) => {
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [fileError, setFileError]       = useState('');
+  const fileInputRef = useRef(null);
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileError('');
+    try {
+      const result = await readFileForChat(file);
+      setAttachedFile({ ...result, originalFile: file });
+    } catch (err) {
+      setFileError(err.message);
+    }
+    e.target.value = '';
+  };
+
+  const onSubmit = (e) => {
+    e.preventDefault();
+    if (!inputValue.trim() && !attachedFile) return;
+    handleSubmitWithFile(e, attachedFile);
+    setAttachedFile(null);
+    setFileError('');
+  };
+
+  return (
+    <div className="border-t border-outline-variant/20 bg-white">
+      {/* File chip */}
+      {attachedFile && (
+        <div className="px-4 pt-3 pb-0">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold"
+            style={{ backgroundColor: '#e0e0ff', color: '#000155' }}>
+            {attachedFile.type === 'image' ? (
+              <img src={attachedFile.dataUrl} alt="preview" className="w-6 h-6 rounded object-cover" />
+            ) : (
+              <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1", color: '#0c1282' }}>
+                {getFileIcon(attachedFile.name)}
+              </span>
+            )}
+            <span className="max-w-[120px] truncate">{attachedFile.name}</span>
+            <button onClick={() => setAttachedFile(null)}
+              className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-black/10"
+              title="Remove">
+              <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>close</span>
+            </button>
+          </div>
+        </div>
+      )}
+      {fileError && <p className="px-4 pt-1 text-[11px] font-semibold" style={{ color: '#ba1a1a' }}>{fileError}</p>}
+
+      <form onSubmit={onSubmit} className="p-4 flex gap-2">
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.txt,.md,.csv,.json,.js,.ts,.jsx,.tsx,.py,.html,.css,.xml,.log,.java,.c,.cpp,.pdf,.yaml,.yml,.sql"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+        {/* Attach button */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="w-10 h-10 rounded-xl flex items-center justify-center transition-all flex-shrink-0"
+          style={{ backgroundColor: attachedFile ? '#e0e0ff' : '#f2f4f6', color: attachedFile ? '#0c1282' : '#767684' }}
+          title="Attach file">
+          <span className="material-symbols-outlined text-base"
+            style={{ fontVariationSettings: attachedFile ? "'FILL' 1" : "'FILL' 0" }}>attach_file</span>
+        </button>
+
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder={attachedFile ? 'Add a message (optional)…' : (placeholder || 'Ask about admissions, programs, fees...')}
+          disabled={isLoading}
+          autoFocus={autoFocus}
+          className="flex-1 px-4 py-2.5 bg-surface-container-low border border-outline-variant/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
+        />
+        <button
+          type="submit"
+          disabled={isLoading || (!inputValue.trim() && !attachedFile)}
+          className="w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center hover:bg-primary/90 disabled:opacity-40 transition-all flex-shrink-0"
+        >
+          <span className="material-symbols-outlined text-base">send</span>
+        </button>
+      </form>
+    </div>
+  );
+};
 
 // ── Fullscreen chat ────────────────────────────────────────────────
-const FullscreenChat = ({ onMinimize, onClose, messages, inputValue, setInputValue, isLoading, handleSubmit, sendMessage, formMode, formProgress, formFieldIndex, totalFormFields, startFormMode }) => {
+const FullscreenChat = ({ onMinimize, onClose, messages, inputValue, setInputValue, isLoading, handleSubmit, handleSubmitWithFile, sendMessage, formMode, formProgress, formFieldIndex, totalFormFields, startFormMode }) => {
   const messagesEndRef = React.useRef(null);
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -335,7 +407,7 @@ const FullscreenChat = ({ onMinimize, onClose, messages, inputValue, setInputVal
             </div>
           )}
           <MessageList messages={messages} isLoading={isLoading} messagesEndRef={messagesEndRef} />
-          <ChatInput inputValue={inputValue} setInputValue={setInputValue} isLoading={isLoading} handleSubmit={handleSubmit}
+          <ChatInput inputValue={inputValue} setInputValue={setInputValue} isLoading={isLoading} handleSubmitWithFile={handleSubmitWithFile}
             autoFocus placeholder={formMode ? 'Type your answer... (or "cancel" to stop)' : undefined} />
         </div>
       </div>
@@ -412,16 +484,28 @@ Give personalized, practical career advice based on this profile. If the student
       setFormFieldIndex(0);
       if (currentFormMode === 'pre-register') {
         localStorage.setItem('chatbot_preregister_data', JSON.stringify(newFormData));
+        // Dispatch event so the form page updates even if already mounted
+        window.dispatchEvent(new CustomEvent('chatbot-form-fill', {
+          detail: { form: 'pre-register', data: newFormData }
+        }));
         addBotMessage(
-          `✅ All done! Here's a summary:\n\n• Name: ${newFormData.fullName}\n• Email: ${newFormData.email}\n• Contact: ${newFormData.contactNumber}\n• SSC: ${newFormData.sscResult} GPA — ${newFormData.sscGroup} (${newFormData.sscBoard}, ${newFormData.sscYear})\n• HSC: ${newFormData.hscResult} GPA — ${newFormData.hscGroup} (${newFormData.hscBoard}, ${newFormData.hscYear})\n• Program: ${newFormData.programHint}\n\n🚀 Pre-filling the form now!`
+          `✅ All done! Here's a summary:\n\n• Name: ${newFormData.fullName}\n• Email: ${newFormData.email}\n• Contact: ${newFormData.contactNumber}\n• SSC: ${newFormData.sscResult} GPA — ${newFormData.sscGroup} (${newFormData.sscBoard}, ${newFormData.sscYear})\n• HSC: ${newFormData.hscResult} GPA — ${newFormData.hscGroup} (${newFormData.hscBoard}, ${newFormData.hscYear})\n• Program: ${newFormData.programHint}\n\n✅ Your form has been automatically filled! Click the form to review and select your program.`
         );
-        setTimeout(() => navigate('/pre-register'), 1800);
+        // Navigate only if not already on the page
+        if (!window.location.pathname.includes('/pre-register')) {
+          setTimeout(() => navigate('/pre-register'), 1800);
+        }
       } else {
         localStorage.setItem('chatbot_admit_data', JSON.stringify(newFormData));
+        window.dispatchEvent(new CustomEvent('chatbot-form-fill', {
+          detail: { form: 'online-admit', data: newFormData }
+        }));
         addBotMessage(
-          `✅ All done! Here's a summary:\n\n• Name: ${newFormData.fullName}\n• Father: ${newFormData.fatherName}\n• Mother: ${newFormData.motherName}\n• Gender: ${newFormData.gender}\n• SSC: ${newFormData.sscGpa} GPA (${newFormData.sscBoard}, ${newFormData.sscYear})\n• HSC: ${newFormData.hscGpa} GPA (${newFormData.hscBoard}, ${newFormData.hscYear})\n• Program: ${newFormData.programName}\n\n🚀 Pre-filling the Online Admit form! You'll still need to upload documents.`
+          `✅ All done! Here's a summary:\n\n• Name: ${newFormData.fullName}\n• Father: ${newFormData.fatherName}\n• Mother: ${newFormData.motherName}\n• Gender: ${newFormData.gender}\n• SSC: ${newFormData.sscGpa} GPA (${newFormData.sscBoard}, ${newFormData.sscYear})\n• HSC: ${newFormData.hscGpa} GPA (${newFormData.hscBoard}, ${newFormData.hscYear})\n• Program: ${newFormData.programName}\n\n✅ Your form has been automatically filled! Review each step and upload your documents.`
         );
-        setTimeout(() => navigate('/admit-card'), 1800);
+        if (!window.location.pathname.includes('/admit-card')) {
+          setTimeout(() => navigate('/admit-card'), 1800);
+        }
       }
       return;
     }
@@ -430,9 +514,38 @@ Give personalized, practical career advice based on this profile. If the student
     addBotMessage(`✓ ${field.label}: ${normalized}\n\n━━━━━━━━━━━━━━━━━━━━\nQuestion ${nextIndex + 1} of ${fields.length}\n\n${fields[nextIndex].question}`);
   };
 
-  const sendMessage = async (text, currentMessages) => {
-    if (!text.trim()) return;
-    const updatedMessages = [...(currentMessages || messages), { id: Date.now(), type: 'user', text, timestamp: new Date() }];
+  const sendMessage = async (text, currentMessages, fileData) => {
+    let finalText = text.trim();
+    if (!finalText && !fileData) return;
+
+    // Inject text file content into message
+    if (fileData?.type === 'text') {
+      finalText = (finalText ? finalText + '\n\n' : '') +
+        `Attached document "${fileData.name}":\n\n${fileData.content}`;
+    } else if (fileData?.type === 'image') {
+      // Image: call vision endpoint, return analysis as bot message
+      const userMsg = { id: Date.now(), type: 'user', text: finalText || `Analyze: ${fileData.name}`, timestamp: new Date(), fileAttachment: { name: fileData.name, type: 'image' } };
+      setMessages(prev => [...prev, userMsg]);
+      setInputValue('');
+      setIsLoading(true);
+      try {
+        const GENERAL_SYS = 'You are a helpful AI assistant for Daffodil International University. Analyze the attached image and answer student questions about it in the context of university admissions, academics, or career.';
+        const reply = await analyzeImageWithVision(
+          [{ role: 'user', content: finalText || `Please analyze this image: ${fileData.name}` }],
+          GENERAL_SYS,
+          fileData.dataUrl
+        );
+        setMessages(prev => [...prev, { id: Date.now() + 1, type: 'bot', text: reply, timestamp: new Date() }]);
+      } catch {
+        setMessages(prev => [...prev, { id: Date.now() + 1, type: 'bot', text: 'Could not analyze the image. Please try again.', timestamp: new Date() }]);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    if (!finalText) return;
+    const updatedMessages = [...(currentMessages || messages), { id: Date.now(), type: 'user', text: finalText, timestamp: new Date(), fileAttachment: fileData ? { name: fileData.name, type: fileData.type } : null }];
     setMessages(updatedMessages);
     setInputValue('');
 
@@ -483,10 +596,15 @@ Give personalized, practical career advice based on this profile. If the student
     sendMessage(inputValue, messages);
   };
 
+  const handleSubmitWithFile = (e, fileData) => {
+    e.preventDefault();
+    sendMessage(inputValue, messages, fileData);
+  };
+
   const currentFormFields = formMode === 'pre-register' ? PRE_REGISTER_FIELDS : formMode === 'online-admit' ? ONLINE_ADMIT_FIELDS : [];
   const formProgress = currentFormFields.length > 0 ? Math.round((formFieldIndex / currentFormFields.length) * 100) : 0;
 
-  return { messages, inputValue, setInputValue, isLoading, sendMessage: (text) => sendMessage(text, messages), handleSubmit, formMode, formProgress, formFieldIndex, totalFormFields: currentFormFields.length, startFormMode };
+  return { messages, inputValue, setInputValue, isLoading, sendMessage: (text) => sendMessage(text, messages), handleSubmit, handleSubmitWithFile: (e, f) => handleSubmitWithFile(e, f), formMode, formProgress, formFieldIndex, totalFormFields: currentFormFields.length, startFormMode };
 };
 
 // ── Main widget export ─────────────────────────────────────────────
@@ -515,6 +633,7 @@ export const ChatbotWidget = ({ pageContext = 'general', studentProfile = null }
         setInputValue={chat.setInputValue}
         isLoading={chat.isLoading}
         handleSubmit={chat.handleSubmit}
+        handleSubmitWithFile={chat.handleSubmitWithFile}
         sendMessage={chat.sendMessage}
         formMode={chat.formMode}
         formProgress={chat.formProgress}
@@ -606,7 +725,7 @@ export const ChatbotWidget = ({ pageContext = 'general', studentProfile = null }
             inputValue={chat.inputValue}
             setInputValue={chat.setInputValue}
             isLoading={chat.isLoading}
-            handleSubmit={chat.handleSubmit}
+            handleSubmitWithFile={chat.handleSubmitWithFile}
             placeholder={chat.formMode ? 'Type your answer... (or "cancel" to stop)' : undefined}
           />
         </div>

@@ -182,31 +182,45 @@ export const PreRegisterPage = () => {
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [selectedFaculty, setSelectedFaculty] = useState(null);
 
-  // Load chatbot-collected data if available
-  useEffect(() => {
-    const chatbotData = JSON.parse(localStorage.getItem('chatbot_preregister_data') || 'null');
-    if (chatbotData) {
-      setPersonal({
-        fullName: chatbotData.fullName || '',
-        email: chatbotData.email || '',
-        dateOfBirth: chatbotData.dateOfBirth || '',
-        contactNumber: chatbotData.contactNumber || '',
-      });
-      setAcademic({
-        sscResult: chatbotData.sscResult || '',
-        sscGroup: chatbotData.sscGroup || '',
-        sscBoard: chatbotData.sscBoard || '',
-        sscYear: chatbotData.sscYear || '',
-        hscResult: chatbotData.hscResult || '',
-        hscGroup: chatbotData.hscGroup || '',
-        hscBoard: chatbotData.hscBoard || '',
-        hscYear: chatbotData.hscYear || '',
-      });
-      localStorage.removeItem('chatbot_preregister_data');
-      toast.success('Form pre-filled by AI Assistant! Review and select your program.', { icon: '🤖' });
-    }
+  // Apply chatbot-collected data and advance to program selection (step 3)
+  const applyChatbotPreRegData = React.useCallback((chatbotData) => {
+    if (!chatbotData) return;
+    setPersonal({
+      fullName:      chatbotData.fullName      || '',
+      email:         chatbotData.email         || '',
+      dateOfBirth:   chatbotData.dateOfBirth   || '',
+      contactNumber: chatbotData.contactNumber || '',
+    });
+    setAcademic({
+      sscResult: chatbotData.sscResult || '',
+      sscGroup:  chatbotData.sscGroup  || '',
+      sscBoard:  chatbotData.sscBoard  || '',
+      sscYear:   chatbotData.sscYear   || '',
+      hscResult: chatbotData.hscResult || '',
+      hscGroup:  chatbotData.hscGroup  || '',
+      hscBoard:  chatbotData.hscBoard  || '',
+      hscYear:   chatbotData.hscYear   || '',
+    });
+    localStorage.removeItem('chatbot_preregister_data');
+    // Advance past personal (step 1) and academic (step 2) to program selection (step 3)
+    setStep(3);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    toast.success('Form auto-filled by AI! Select your program to continue.', { icon: '🤖' });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    // Check localStorage on mount (e.g. navigated from another page)
+    const saved = JSON.parse(localStorage.getItem('chatbot_preregister_data') || 'null');
+    if (saved) applyChatbotPreRegData(saved);
+
+    // Listen for real-time event fired when chatbot is on this same page
+    const handler = (e) => {
+      if (e.detail?.form === 'pre-register') applyChatbotPreRegData(e.detail.data);
+    };
+    window.addEventListener('chatbot-form-fill', handler);
+    return () => window.removeEventListener('chatbot-form-fill', handler);
+  }, [applyChatbotPreRegData]);
 
   const eligibilityResult = selectedProgram
     ? checkEligibility(selectedProgram, academic.sscResult, academic.hscResult, academic.sscGroup)

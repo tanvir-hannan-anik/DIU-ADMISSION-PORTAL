@@ -260,6 +260,16 @@ class GroqService:
             self.advisor_model = self.model
             logger.warning("GROQ_API_KEY_2 not set — Smart Advisor will use primary key")
 
+        # Dedicated client for Smart Proctor (API key 3)
+        if Config.GROQ_API_KEY_3:
+            self.proctor_client = Groq(api_key=Config.GROQ_API_KEY_3)
+            self.proctor_model = Config.GROQ_MODEL_3
+            logger.info(f"Smart Proctor Groq client initialized - model: {self.proctor_model}")
+        else:
+            self.proctor_client = self.client
+            self.proctor_model = self.model
+            logger.warning("GROQ_API_KEY_3 not set — Smart Proctor will use primary key")
+
     def _build_system_prompt(self) -> str:
         # SYSTEM_PROMPT already contains comprehensive CIS + all dept data.
         # Skipping dynamic KB injection to avoid token duplication and limit errors.
