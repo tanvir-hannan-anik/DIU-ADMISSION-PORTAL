@@ -95,6 +95,12 @@ export const Navigation = () => {
           <button onClick={() => navigate('/facilities')} className={navLinkClass('/facilities')}>
             Campus Life
           </button>
+          <button onClick={() => navigate('/jobs')} className={navLinkClass('/jobs')}>
+            <span className="flex items-center gap-1">
+              Jobs
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black bg-green-500 text-white leading-none">AI</span>
+            </span>
+          </button>
         </div>
 
         {/* Action Buttons */}
@@ -197,6 +203,12 @@ export const Navigation = () => {
           </button>
           <button onClick={() => { navigate('/faculty'); setIsMobileMenuOpen(false); }} className={mobileNavLinkClass('/faculty')}>
             Faculty
+          </button>
+          <button onClick={() => { navigate('/jobs'); setIsMobileMenuOpen(false); }} className={mobileNavLinkClass('/jobs')}>
+            <span className="flex items-center gap-2">
+              Jobs & Career
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black bg-green-500 text-white leading-none">AI</span>
+            </span>
           </button>
           <div className="pt-2 border-t border-[#0c1282]/10 mt-2">
             {isAuthenticated ? (

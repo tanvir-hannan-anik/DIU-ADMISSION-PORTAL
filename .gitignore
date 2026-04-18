@@ -1,6 +1,8 @@
 # Frontend
 frontend-react/node_modules/
 frontend-react/build/
+frontend-react/.env
+frontend-react/.env.local
 
 # Spring Boot compiled artifacts
 backend-spring-boot/target/

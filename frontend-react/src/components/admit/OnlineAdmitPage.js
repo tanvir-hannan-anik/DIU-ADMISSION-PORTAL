@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom'; // Online Admission Portal
 import { Navigation } from '../common/Navigation';
 import { Footer } from '../common/Footer';
+import { ChatbotWidget } from '../common/ChatbotWidget';
 import { toast } from 'react-toastify';
 import API_CONFIG from '../../config/apiConfig';
 
@@ -1059,6 +1060,7 @@ export const OnlineAdmitPage = () => {
           </div>
         </div>
       </main>
+      <ChatbotWidget pageContext="online-admit" />
       <Footer />
     </div>
   );

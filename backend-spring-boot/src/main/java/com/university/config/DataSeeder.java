@@ -49,7 +49,7 @@ public class DataSeeder implements CommandLineRunner {
                 AdmittedStudent.builder()
                     .name("Tanvir Hanna Anik")
                     .studentId("251-16-021")
-                    .department("Department of CIS")
+                    .department("Department of Computing and Information System (CIS)")
                     .email("251-16-021@diu.edu.bd")
                     .semester("Batch 21-A")
                     .build()

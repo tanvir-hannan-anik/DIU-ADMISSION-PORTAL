@@ -23,7 +23,7 @@ UNIVERSITY OVERVIEW
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DEPARTMENT RATINGS & MARKET DEMAND (2025)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⭐ CIS  (Computing & Information System) — Rating: 9.5/10 | 🔥 #1 FASTEST GROWING DEPT 2025
+⭐ CIS  (Computing and Information System) — Rating: 9.5/10 | 🔥 #1 FASTEST GROWING DEPT 2025
   → Demand: Extremely High | Job market: IT firms, banks, telecom, govt ICT, startups, abroad
   → Avg starting salary: BDT 35,000–60,000/month | Abroad opportunities: Very High
 

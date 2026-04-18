@@ -20,6 +20,7 @@ import { ProfilePage }            from './components/student/ProfilePage';
 import { FacilitiesPage }         from './components/facilities/FacilitiesPage';
 import { FacultyPage }            from './components/faculty/FacultyPage';
 import { ScholarshipPage }        from './components/scholarship/ScholarshipPage';
+import { JobsPage }               from './components/jobs/JobsPage';
 
 // ── Protected route: redirects to /login if not authenticated ─────────────────
 function ProtectedRoute({ children }) {
@@ -68,6 +69,7 @@ function App() {
           <Route path="/facilities"  element={<FacilitiesPage />} />
           <Route path="/faculty"     element={<FacultyPage />} />
           <Route path="/scholarship" element={<ScholarshipPage />} />
+          <Route path="/jobs"        element={<ProtectedRoute><JobsPage /></ProtectedRoute>} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" />} />

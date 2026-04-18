@@ -6,6 +6,73 @@ import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'react-toastify';
 import { getProfile as getProfileFromDb, saveProfile as saveProfileToDb, getActiveEnrollment } from '../../services/studentDataService';
 
+// ── Career profile storage ────────────────────────────────────────
+export const CAREER_KEY = (email) => `diu_career_${email}`;
+export const loadCareerProfile = (email) => {
+  try { return JSON.parse(localStorage.getItem(CAREER_KEY(email))) || {}; } catch { return {}; }
+};
+export const saveCareerProfile = (email, data) =>
+  localStorage.setItem(CAREER_KEY(email), JSON.stringify(data));
+
+const defaultCareer = () => ({
+  title: '', summary: '', careerGoal: '',
+  github: '', portfolio: '', linkedin: '',
+  techSkills: [], softSkills: [],
+  experience: [],
+  projects: [],
+  certificates: [],
+});
+
+const TECH_SUGGESTIONS = [
+  'Python','JavaScript','React','Node.js','Java','C++','SQL','MongoDB','Machine Learning',
+  'TensorFlow','Docker','AWS','Git','TypeScript','Flutter','Django','Spring Boot','Data Analysis',
+  'UI/UX Design','Figma','PHP','Laravel','Kubernetes','DevOps','Cybersecurity',
+];
+const SOFT_SUGGESTIONS = [
+  'Communication','Teamwork','Problem Solving','Leadership','Time Management',
+  'Critical Thinking','Adaptability','Creativity','Attention to Detail',
+];
+
+// Tag input component for skills
+function TagInput({ tags, onChange, suggestions, placeholder }) {
+  const [input, setInput] = useState('');
+  const [showSug, setShowSug] = useState(false);
+
+  const add = (val) => {
+    const v = val.trim();
+    if (v && !tags.includes(v)) onChange([...tags, v]);
+    setInput(''); setShowSug(false);
+  };
+  const filtered = (suggestions || []).filter(s =>
+    s.toLowerCase().includes(input.toLowerCase()) && !tags.includes(s)
+  );
+
+  return (
+    <div className="relative">
+      <div className="flex flex-wrap gap-1.5 p-2.5 border-b-2 border-slate-300 focus-within:border-[#0c1282] bg-slate-50 rounded-t min-h-[44px]">
+        {tags.map(tag => (
+          <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#0c1282]/10 text-[#0c1282] rounded text-xs font-semibold">
+            {tag}
+            <button type="button" onClick={() => onChange(tags.filter(t => t !== tag))} className="text-[#0c1282]/50 hover:text-red-500">×</button>
+          </span>
+        ))}
+        <input value={input} onChange={e => { setInput(e.target.value); setShowSug(true); }}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(input); } }}
+          onFocus={() => setShowSug(true)} onBlur={() => setTimeout(() => setShowSug(false), 150)}
+          placeholder={tags.length === 0 ? placeholder : ''} className="outline-none text-sm bg-transparent min-w-[120px] flex-1" />
+      </div>
+      {showSug && filtered.length > 0 && (
+        <div className="absolute z-20 top-full left-0 right-0 bg-white border border-slate-200 rounded-b shadow-lg p-2 flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+          {filtered.slice(0, 12).map(s => (
+            <button key={s} type="button" onMouseDown={() => add(s)}
+              className="px-2 py-0.5 text-xs bg-slate-100 hover:bg-[#0c1282] hover:text-white rounded transition-all">{s}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Department code → info map ────────────────────────────────────────────────
 const DEPT_MAP = {
   '11': { name: 'Electrical & Electronic Engineering',   short: 'EEE' },
@@ -13,7 +80,7 @@ const DEPT_MAP = {
   '13': { name: 'Robotics & Mechatronics',               short: 'RME' },
   '14': { name: 'Software Engineering',                  short: 'SWE' },
   '15': { name: 'Computer Science & Engineering',        short: 'CSE' },
-  '16': { name: 'Computing & Information System',        short: 'CIS' },
+  '16': { name: 'Computing and Information System',      short: 'CIS' },
   '17': { name: 'Multimedia & Creative Technology',      short: 'MCT' },
   '18': { name: 'Information Technology & Management',   short: 'ITM' },
   '19': { name: 'Information & Communication Engineering', short: 'ICE' },
@@ -92,6 +159,8 @@ function ProfileContent({ user, navigate, logout }) {
   const [editing,  setEditing]  = useState(false);
   const [photo,    setPhoto]    = useState(() => loadPhoto(user.email));
   const [enrollment, setEnrollment] = useState(() => getActiveEnrollment(user.email));
+  const [career, setCareer] = useState(() => ({ ...defaultCareer(), ...loadCareerProfile(user.email) }));
+  const updateCareer = (key, val) => setCareer(prev => ({ ...prev, [key]: val }));
 
   const [form, setForm] = useState(() => {
     const saved = loadProfile(user.email);
@@ -164,6 +233,7 @@ function ProfileContent({ user, navigate, logout }) {
       phone:            form.phone,
       address:          form.address,
     });
+    saveCareerProfile(user.email, career);
     setEditing(false);
     toast.success('Profile saved successfully');
   };
@@ -196,6 +266,7 @@ function ProfileContent({ user, navigate, logout }) {
               { label: 'Academic Record', icon: 'school',               action: () => {}, active: true },
               { label: 'Financials',      icon: 'account_balance',      action: () => window.open('https://studentportal.diu.edu.bd/', '_blank') },
               { label: 'Enrollment',      icon: 'assignment_turned_in', action: () => navigate('/course-registration') },
+              { label: 'Jobs & Career',   icon: 'work',                 action: () => navigate('/jobs') },
               { label: 'Support',         icon: 'help_outline',         action: () => window.open('mailto:support@daffodilvarsity.edu.bd?subject=Student Support Request', '_blank') },
             ].map(({ label, icon, action, active }) => (
               <button key={label} onClick={action}
@@ -488,6 +559,185 @@ function ProfileContent({ user, navigate, logout }) {
                   </div>
                 </div>
               </div>
+
+              {/* ── Career & Jobs Profile ─────────────────────────── */}
+              {editing ? (
+                <div className="bg-white rounded-xl p-8 border border-slate-200/70 shadow-sm space-y-7">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-xl bg-[#0c1282]/10 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-[#0c1282]" style={{ fontVariationSettings: "'FILL' 1" }}>work</span>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-[#000155]">Career & Jobs Profile</h3>
+                      <p className="text-xs text-slate-400">Used for job matching, CV generation, and career advice</p>
+                    </div>
+                  </div>
+
+                  {/* Title + Career Goal */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Professional Title</label>
+                      <input value={career.title} onChange={e => updateCareer('title', e.target.value)} placeholder="e.g. Software Engineer, AI Developer"
+                        className="w-full text-sm font-semibold text-slate-800 border-b-2 border-slate-300 focus:border-[#0c1282] bg-slate-50 rounded-t px-2 py-2 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Career Goal</label>
+                      <input value={career.careerGoal} onChange={e => updateCareer('careerGoal', e.target.value)} placeholder="e.g. AI Engineer, Full Stack Developer"
+                        className="w-full text-sm font-semibold text-slate-800 border-b-2 border-slate-300 focus:border-[#0c1282] bg-slate-50 rounded-t px-2 py-2 outline-none" />
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Professional Summary</label>
+                    <textarea value={career.summary} onChange={e => updateCareer('summary', e.target.value)} rows={3}
+                      placeholder="A passionate developer with expertise in..."
+                      className="w-full text-sm text-slate-800 border-b-2 border-slate-300 focus:border-[#0c1282] bg-slate-50 rounded-t px-2 py-2 outline-none resize-none" />
+                  </div>
+
+                  {/* Skills */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Technical Skills</label>
+                      <TagInput tags={career.techSkills} onChange={v => updateCareer('techSkills', v)} suggestions={TECH_SUGGESTIONS} placeholder="Type skill, press Enter…" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Soft Skills</label>
+                      <TagInput tags={career.softSkills} onChange={v => updateCareer('softSkills', v)} suggestions={SOFT_SUGGESTIONS} placeholder="e.g. Communication…" />
+                    </div>
+                  </div>
+
+                  {/* Links */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {[
+                      { key: 'github',    label: 'GitHub URL',    ph: 'github.com/username' },
+                      { key: 'portfolio', label: 'Portfolio Site', ph: 'yoursite.com' },
+                      { key: 'linkedin',  label: 'LinkedIn URL',   ph: 'linkedin.com/in/you' },
+                    ].map(({ key, label, ph }) => (
+                      <div key={key}>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">{label}</label>
+                        <input value={career[key]} onChange={e => updateCareer(key, e.target.value)} placeholder={ph}
+                          className="w-full text-sm font-semibold text-slate-800 border-b-2 border-slate-300 focus:border-[#0c1282] bg-slate-50 rounded-t px-2 py-2 outline-none" />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Experience */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Work Experience</label>
+                      <button onClick={() => updateCareer('experience', [...career.experience, { role: '', company: '', duration: '', description: '' }])}
+                        className="text-xs font-bold text-[#0c1282] flex items-center gap-1 hover:opacity-80">
+                        <span className="material-symbols-outlined text-sm">add_circle</span>Add
+                      </button>
+                    </div>
+                    {career.experience.length === 0 && <p className="text-xs text-slate-400 italic">No experience yet.</p>}
+                    {career.experience.map((exp, i) => (
+                      <div key={i} className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-2">
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                          <input value={exp.role} onChange={e => { const a=[...career.experience]; a[i].role=e.target.value; updateCareer('experience',a); }}
+                            placeholder="Job Title" className="px-2 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:border-[#0c1282]" />
+                          <input value={exp.company} onChange={e => { const a=[...career.experience]; a[i].company=e.target.value; updateCareer('experience',a); }}
+                            placeholder="Company" className="px-2 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:border-[#0c1282]" />
+                          <input value={exp.duration} onChange={e => { const a=[...career.experience]; a[i].duration=e.target.value; updateCareer('experience',a); }}
+                            placeholder="Jan 2024 – Present" className="px-2 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:border-[#0c1282]" />
+                        </div>
+                        <textarea value={exp.description} rows={2} onChange={e => { const a=[...career.experience]; a[i].description=e.target.value; updateCareer('experience',a); }}
+                          placeholder="Describe your role..." className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:border-[#0c1282] resize-none" />
+                        <button onClick={() => updateCareer('experience', career.experience.filter((_,idx)=>idx!==i))}
+                          className="mt-1 text-[11px] text-red-400 hover:text-red-600 flex items-center gap-0.5">
+                          <span className="material-symbols-outlined text-sm">delete</span>Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Projects */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Projects</label>
+                      <button onClick={() => updateCareer('projects', [...career.projects, { name: '', description: '', tech: '', url: '' }])}
+                        className="text-xs font-bold text-[#0c1282] flex items-center gap-1 hover:opacity-80">
+                        <span className="material-symbols-outlined text-sm">add_circle</span>Add
+                      </button>
+                    </div>
+                    {career.projects.length === 0 && <p className="text-xs text-slate-400 italic">No projects yet. Projects boost your CV!</p>}
+                    {career.projects.map((p, i) => (
+                      <div key={i} className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-2">
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                          <input value={p.name} onChange={e => { const a=[...career.projects]; a[i].name=e.target.value; updateCareer('projects',a); }}
+                            placeholder="Project Name" className="px-2 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:border-[#0c1282]" />
+                          <input value={p.tech} onChange={e => { const a=[...career.projects]; a[i].tech=e.target.value; updateCareer('projects',a); }}
+                            placeholder="Tech used" className="px-2 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:border-[#0c1282]" />
+                          <input value={p.url} onChange={e => { const a=[...career.projects]; a[i].url=e.target.value; updateCareer('projects',a); }}
+                            placeholder="GitHub/Live link" className="col-span-2 px-2 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:border-[#0c1282]" />
+                        </div>
+                        <textarea value={p.description} rows={2} onChange={e => { const a=[...career.projects]; a[i].description=e.target.value; updateCareer('projects',a); }}
+                          placeholder="What this project does..." className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:border-[#0c1282] resize-none" />
+                        <button onClick={() => updateCareer('projects', career.projects.filter((_,idx)=>idx!==i))}
+                          className="mt-1 text-[11px] text-red-400 hover:text-red-600 flex items-center gap-0.5">
+                          <span className="material-symbols-outlined text-sm">delete</span>Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Certificates */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Certificates & Achievements</label>
+                      <button onClick={() => updateCareer('certificates', [...career.certificates, { name: '', issuer: '', year: '' }])}
+                        className="text-xs font-bold text-[#0c1282] flex items-center gap-1 hover:opacity-80">
+                        <span className="material-symbols-outlined text-sm">add_circle</span>Add
+                      </button>
+                    </div>
+                    {career.certificates.length === 0 && <p className="text-xs text-slate-400 italic">No certificates yet.</p>}
+                    {career.certificates.map((c, i) => (
+                      <div key={i} className="flex gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-2 mb-2">
+                        <span className="material-symbols-outlined text-yellow-500 text-base flex-shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
+                        <input value={c.name} onChange={e => { const a=[...career.certificates]; a[i].name=e.target.value; updateCareer('certificates',a); }}
+                          placeholder="Certificate Name" className="flex-1 px-2 py-1 border border-slate-200 rounded text-xs focus:outline-none focus:border-[#0c1282]" />
+                        <input value={c.issuer} onChange={e => { const a=[...career.certificates]; a[i].issuer=e.target.value; updateCareer('certificates',a); }}
+                          placeholder="Issuer" className="w-28 px-2 py-1 border border-slate-200 rounded text-xs focus:outline-none focus:border-[#0c1282]" />
+                        <input value={c.year} onChange={e => { const a=[...career.certificates]; a[i].year=e.target.value; updateCareer('certificates',a); }}
+                          placeholder="Year" className="w-16 px-2 py-1 border border-slate-200 rounded text-xs focus:outline-none focus:border-[#0c1282]" />
+                        <button onClick={() => updateCareer('certificates', career.certificates.filter((_,idx)=>idx!==i))} className="text-red-400 hover:text-red-600">
+                          <span className="material-symbols-outlined text-sm">close</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                /* Career profile VIEW mode (compact summary) */
+                (career.techSkills.length > 0 || career.careerGoal || career.projects.length > 0) && (
+                  <div className="bg-white rounded-xl p-6 border border-slate-200/70 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-bold text-[#000155] flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[#0c1282]" style={{ fontVariationSettings: "'FILL' 1" }}>work</span>
+                        Career Profile
+                      </h3>
+                      <button onClick={() => navigate('/jobs')} className="text-xs font-bold text-[#0c1282] flex items-center gap-1 hover:underline">
+                        <span className="material-symbols-outlined text-sm">open_in_new</span>View Jobs
+                      </button>
+                    </div>
+                    {career.careerGoal && <p className="text-xs text-slate-500 mb-3">🎯 Goal: <strong>{career.careerGoal}</strong></p>}
+                    {career.techSkills.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {career.techSkills.slice(0,8).map(s => (
+                          <span key={s} className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-[#0c1282]/10 text-[#0c1282]">{s}</span>
+                        ))}
+                        {career.techSkills.length > 8 && <span className="text-[10px] text-slate-400 font-semibold">+{career.techSkills.length-8} more</span>}
+                      </div>
+                    )}
+                    <div className="flex gap-4 text-xs text-slate-500">
+                      {career.experience.length > 0 && <span>💼 {career.experience.length} experience{career.experience.length>1?'s':''}</span>}
+                      {career.projects.length > 0 && <span>🚀 {career.projects.length} project{career.projects.length>1?'s':''}</span>}
+                      {career.certificates.length > 0 && <span>🏅 {career.certificates.length} certificate{career.certificates.length>1?'s':''}</span>}
+                    </div>
+                  </div>
+                )
+              )}
 
               {/* Info callout */}
               <div className="rounded-xl p-8 border-l-4 border-[#0c1282]"

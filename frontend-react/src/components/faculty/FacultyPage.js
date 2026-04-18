@@ -5,7 +5,7 @@ import { Footer } from '../common/Footer';
 
 const FACULTY_DATA = {
   CIS: [
-    { name: 'Mr. Md. Sarwar Hossain Mollah', position: 'Associate Professor & Head', research: 'Information Systems, Cloud Architecture, Network Design', achievements: 'Head of CIS Department · 15+ years academic experience' },
+    { name: 'Mr. Md. Sarwar Hossain Mollah', position: 'Associate Professor & Head', research: 'Information Systems, Cloud Architecture, Network Design', achievements: 'Head of Computing and Information System (CIS) Department · 15+ years academic experience' },
     { name: 'Prof. Dr. Bimal Chandra Das', position: 'Professor & Associate Dean', research: 'Computer Science, Research Management, Higher Education', achievements: 'Associate Dean, Faculty of Science & IT' },
     { name: 'Mr. Md. Biplob Hossain', position: 'Assistant Professor', research: 'Cloud Computing, Discrete Mathematics, Computer Architecture', achievements: 'Cloud Computing Research · Multiple national publications' },
     { name: 'Mr. Md. Nasimul Kader', position: 'Assistant Professor', research: 'Database Systems, OOP, Operating Systems', achievements: 'Industry Collaboration Projects · OS research contributor' },
@@ -13,7 +13,7 @@ const FACULTY_DATA = {
     { name: 'Mr. Md. Mehedi Hassan', position: 'Senior Lecturer', research: 'Data Structures, Algorithms, Data Analysis, Big Data', achievements: 'Algorithm Optimization Research · DIU Innovation Award' },
     { name: 'Mr. Md. Faruk Hosen', position: 'Senior Lecturer', research: 'AI, Machine Learning for IoT, Structured Programming', achievements: 'ML for IoT Research Projects · Conference presenter' },
     { name: 'Ms. Sonia Nasrin', position: 'Lecturer', research: 'Computer Architecture, IS Management, Digital Systems', achievements: 'IS Management Research · Best Lecturer nomination 2024' },
-    { name: 'Mr. Israfil', position: 'Lecturer', research: 'Web Engineering, Full-Stack Development, Web Technologies', achievements: 'CIS Dept Alumni · Web Technologies Expert' },
+    { name: 'Mr. Israfil', position: 'Lecturer', research: 'Web Engineering, Full-Stack Development, Web Technologies', achievements: 'Computing and Information System (CIS) Alumni · Web Technologies Expert' },
     { name: 'Ms. Tamanna Akter', position: 'Lecturer', research: 'English Language, Academic Writing, Communication Skills', achievements: 'Language & Communication Research · ELT publications' },
   ],
   CSE: [

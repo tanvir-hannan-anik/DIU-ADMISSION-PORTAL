@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navigation } from '../common/Navigation';
 import { Footer } from '../common/Footer';
+import { ChatbotWidget } from '../common/ChatbotWidget';
 import { admissionService } from '../../services/admissionService';
 import { toast } from 'react-toastify';
 
@@ -899,6 +900,7 @@ export const PreRegisterPage = () => {
           )}
         </div>
       </main>
+      <ChatbotWidget pageContext="pre-register" />
       <Footer />
     </div>
   );
