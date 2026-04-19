@@ -1,15 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { noticeService } from '../../services/noticeService';
+
+const TYPE_STYLES = {
+  URGENT:  { bar: 'bg-red-500',    badge: 'bg-red-100 text-red-700',     icon: '🚨' },
+  WARNING: { bar: 'bg-amber-500',  badge: 'bg-amber-100 text-amber-700',  icon: '⚠️' },
+  EVENT:   { bar: 'bg-purple-500', badge: 'bg-purple-100 text-purple-700', icon: '🎉' },
+  INFO:    { bar: 'bg-blue-500',   badge: 'bg-blue-100 text-blue-700',    icon: 'ℹ️' },
+};
 
 export const Navigation = () => {
   const navigate  = useNavigate();
   const location  = useLocation();
   const { isAuthenticated, logout, user } = useAuth();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [profilePhoto, setProfilePhoto] = useState(null);
 
-  // Load profile photo from localStorage whenever user changes or page focuses
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [profilePhoto,     setProfilePhoto]     = useState(null);
+
+  // Notices state
+  const [notices,      setNotices]      = useState([]);
+  const [noticesOpen,  setNoticesOpen]  = useState(false);
+  const [expanded,     setExpanded]     = useState(null);
+  const [seen,         setSeen]         = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('diu_seen_notices') || '[]')); }
+    catch { return new Set(); }
+  });
+  const noticesRef = useRef(null);
+
+  // Load profile photo
   useEffect(() => {
     const loadPhoto = () => {
       if (user?.email) {
@@ -19,7 +38,6 @@ export const Navigation = () => {
     };
     loadPhoto();
     window.addEventListener('focus', loadPhoto);
-    // Also listen for storage changes (photo updated on profile page)
     window.addEventListener('storage', loadPhoto);
     return () => {
       window.removeEventListener('focus', loadPhoto);
@@ -27,13 +45,46 @@ export const Navigation = () => {
     };
   }, [user]);
 
-  // Re-read photo after navigation (covers same-tab profile save)
   useEffect(() => {
     if (user?.email) {
       const photo = localStorage.getItem(`diu_photo_${user.email}`);
       setProfilePhoto(photo || null);
     }
   }, [location.pathname, user]);
+
+  // Fetch notices once on mount
+  useEffect(() => {
+    noticeService.getActiveNotices()
+      .then(res => {
+        const data = res.data?.data ?? res.data;
+        if (Array.isArray(data)) setNotices(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (noticesRef.current && !noticesRef.current.contains(e.target)) {
+        setNoticesOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const unreadCount = notices.filter(n => !seen.has(n.id)).length;
+
+  const openNotices = () => {
+    setNoticesOpen(prev => !prev);
+    setExpanded(null);
+  };
+
+  const markAllSeen = () => {
+    const newSeen = new Set(notices.map(n => n.id));
+    setSeen(newSeen);
+    localStorage.setItem('diu_seen_notices', JSON.stringify([...newSeen]));
+  };
 
   const handleLogout = () => {
     logout();
@@ -57,6 +108,87 @@ export const Navigation = () => {
         : 'text-[#0c1282]/70 hover:bg-[#0c1282]/5 hover:text-[#0c1282]'
     }`;
 
+  // ── Notices Dropdown Panel ─────────────────────────────────────────────────
+  const NoticesDropdown = () => (
+    <div className="absolute right-0 top-full mt-2 w-[360px] max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/60">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🔔</span>
+          <span className="font-bold text-gray-800 text-sm">University Notices</span>
+          {unreadCount > 0 && (
+            <span className="bg-[#0c1282] text-white text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none">
+              {unreadCount} new
+            </span>
+          )}
+        </div>
+        {unreadCount > 0 && (
+          <button
+            onClick={markAllSeen}
+            className="text-[10px] text-[#0c1282] font-semibold hover:underline"
+          >
+            Mark all read
+          </button>
+        )}
+      </div>
+
+      {/* Notice list */}
+      <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-50">
+        {notices.length === 0 ? (
+          <div className="py-10 text-center text-gray-400 text-sm">No active notices</div>
+        ) : (
+          notices.map(n => {
+            const style  = TYPE_STYLES[n.type] || TYPE_STYLES.INFO;
+            const isOpen = expanded === n.id;
+            const isNew  = !seen.has(n.id);
+            return (
+              <div
+                key={n.id}
+                className={`relative transition-colors ${isNew ? 'bg-blue-50/40' : 'bg-white'} hover:bg-gray-50`}
+              >
+                {/* left color bar */}
+                <div className={`absolute left-0 top-0 bottom-0 w-1 ${style.bar}`} />
+                <div className="pl-4 pr-3 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-sm shrink-0">{style.icon}</span>
+                      <p className="text-xs font-semibold text-gray-800 leading-snug line-clamp-2">{n.title}</p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isNew && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />}
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${style.badge}`}>{n.type}</span>
+                    </div>
+                  </div>
+                  <p className={`text-[11px] text-gray-500 mt-1 leading-relaxed ${isOpen ? '' : 'line-clamp-2'}`}>
+                    {n.content}
+                  </p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[10px] text-gray-400">
+                      {new Date(n.createdAt).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                    <button
+                      onClick={() => setExpanded(isOpen ? null : n.id)}
+                      className="text-[10px] text-[#0c1282] font-semibold hover:underline"
+                    >
+                      {isOpen ? 'Show less ↑' : 'Read more ↓'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Footer */}
+      {notices.length > 0 && (
+        <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/60 text-center">
+          <span className="text-[11px] text-gray-400">{notices.length} active notice{notices.length !== 1 ? 's' : ''}</span>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <nav className="fixed top-0 w-full z-50 bg-white shadow-md">
       <div className="flex justify-between items-center px-4 md:px-8 h-16 md:h-20 w-full max-w-screen-2xl mx-auto font-['Manrope'] text-sm tracking-wide">
@@ -66,12 +198,11 @@ export const Navigation = () => {
           <img src="/diulogo.png" alt="Daffodil International University" className="h-12 w-auto" />
         </div>
 
-        {/* Desktop Navigation */}
+        {/* Desktop Nav links */}
         <div className="hidden md:flex items-center gap-7">
           <button onClick={() => navigate('/')} className={navLinkClass('/')}>
             Programs
           </button>
-
           {isAuthenticated && (
             <>
               <button
@@ -85,7 +216,6 @@ export const Navigation = () => {
               </button>
             </>
           )}
-
           <button onClick={() => navigate('/pre-register')} className={navLinkClass('/pre-register')}>
             Admissions
           </button>
@@ -111,7 +241,7 @@ export const Navigation = () => {
           )}
         </div>
 
-        {/* Action Buttons */}
+        {/* Desktop action buttons */}
         <div className="hidden md:flex items-center gap-3">
           <button
             onClick={() => navigate('/pre-register')}
@@ -120,9 +250,32 @@ export const Navigation = () => {
             Apply Now
           </button>
 
+          {/* Notices bell — desktop (authenticated only) */}
+          {isAuthenticated && (
+            <div ref={noticesRef} className="relative">
+              <button
+                onClick={openNotices}
+                title="University Notices"
+                className="relative w-9 h-9 rounded-full border-2 border-[#0c1282]/20 hover:border-[#0c1282]/60 transition-all flex items-center justify-center hover:bg-[#0c1282]/5"
+              >
+                <span
+                  className="material-symbols-outlined text-[#0c1282] text-xl"
+                  style={{ fontVariationSettings: noticesOpen ? "'FILL' 1" : "'FILL' 0" }}
+                >
+                  notifications
+                </span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-0.5 leading-none">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              {noticesOpen && <NoticesDropdown />}
+            </div>
+          )}
+
           {isAuthenticated ? (
             <div className="flex items-center gap-2">
-              {/* Profile photo avatar */}
               <button
                 onClick={() => navigate('/profile')}
                 title="My Profile"
@@ -153,8 +306,31 @@ export const Navigation = () => {
           )}
         </div>
 
-        {/* Mobile: right side (avatar + hamburger) */}
+        {/* Mobile: right side */}
         <div className="md:hidden flex items-center gap-2">
+          {/* Notices bell — mobile (authenticated only) */}
+          {isAuthenticated && (
+            <div ref={noticesRef} className="relative">
+              <button
+                onClick={openNotices}
+                className="relative w-8 h-8 rounded-full border-2 border-[#0c1282]/20 flex items-center justify-center"
+              >
+                <span
+                  className="material-symbols-outlined text-[#0c1282] text-lg"
+                  style={{ fontVariationSettings: noticesOpen ? "'FILL' 1" : "'FILL' 0" }}
+                >
+                  notifications
+                </span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center px-0.5 leading-none">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              {noticesOpen && <NoticesDropdown />}
+            </div>
+          )}
+
           {isAuthenticated && (
             <button onClick={() => navigate('/profile')} className="w-8 h-8 rounded-full overflow-hidden border-2 border-[#0c1282]/20 flex-shrink-0">
               {profilePhoto ? (

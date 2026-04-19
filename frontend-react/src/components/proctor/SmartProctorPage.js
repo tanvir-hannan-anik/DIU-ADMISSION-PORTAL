@@ -3,7 +3,7 @@ import { Navigation } from '../common/Navigation';
 import { useAuth } from '../../hooks/useAuth';
 import axios from 'axios';
 import API_CONFIG from '../../config/apiConfig';
-import { readFileForChat, getFileIcon, formatFileSize, analyzeImageWithVision } from '../../utils/fileReader';
+import { readFileForChat, getFileIcon, analyzeImageWithVision } from '../../utils/fileReader';
 
 const SYSTEM_PROMPT = `You are an AI-powered Smart Proctor Assistant for Daffodil International University (DIU).
 Your goal is to act like a real university Proctor and help students with discipline-related issues, complaints and reporting, guidance and rules, and appointment booking with the Proctor.
@@ -209,10 +209,10 @@ export function SmartProctorPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#f7f9fb', fontFamily: 'Manrope, sans-serif' }}>
+    <div className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: '#f7f9fb', fontFamily: 'Manrope, sans-serif' }}>
       <Navigation />
 
-      <main className="flex-grow flex flex-col max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8" style={{ paddingTop: '100px' }}>
+      <main className="flex-grow flex flex-col max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-4 overflow-hidden" style={{ paddingTop: '100px' }}>
 
         {/* Emergency Banner */}
         {showEmergency && (
@@ -244,7 +244,7 @@ export function SmartProctorPage() {
 
         {/* Chat Container */}
         <div className="flex-grow flex flex-col rounded-xl overflow-hidden shadow-lg border"
-          style={{ backgroundColor: '#ffffff', borderColor: '#c6c5d4', minHeight: '520px', maxHeight: 'calc(100vh - 320px)' }}>
+          style={{ backgroundColor: '#ffffff', borderColor: '#c6c5d4' }}>
 
           {/* Chat Header */}
           <div className="p-5 flex items-center justify-between flex-shrink-0"
@@ -429,31 +429,6 @@ export function SmartProctorPage() {
           </div>
         </div>
 
-        {/* Footer Info Cards */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6" style={{ opacity: 0.85 }}>
-          {[
-            {
-              title: 'Privacy Protocol',
-              body: 'Your inquiries are end-to-end encrypted and visible only to authorized institutional advisors.',
-            },
-            {
-              title: 'Complaint Tracking',
-              body: 'Filed complaints are assigned a unique ID and tracked until resolution by the Proctor office.',
-            },
-            {
-              title: 'Proctor Availability',
-              body: 'AI Support 24/7. Proctor office available Sun–Thu, 9:00 AM – 5:00 PM. Room: Admin Building 3.',
-            },
-          ].map((card) => (
-            <div key={card.title} className="p-4 rounded-xl border-l-2"
-              style={{ backgroundColor: '#f2f4f6', borderColor: '#0c1282' }}>
-              <p className="text-xs font-bold mb-1 uppercase tracking-wider" style={{ color: '#000155' }}>
-                {card.title}
-              </p>
-              <p className="text-[11px]" style={{ color: '#464652' }}>{card.body}</p>
-            </div>
-          ))}
-        </div>
       </main>
     </div>
   );

@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { toast } from 'react-toastify';
 import { SmartAdvisorFullscreen } from './SmartAdvisorFullscreen';
-import api from '../../services/api';
 import API_CONFIG from '../../config/apiConfig';
 import axios from 'axios';
 import { saveLateRegistration } from '../../services/studentDataService';
@@ -180,6 +179,10 @@ const VSTEPS = [
 // internal step (1-10) → visual step (1-6)
 const toVisual = (s) => s <= 2 ? 1 : s === 3 ? 2 : s === 4 ? 3 : s <= 6 ? 4 : s <= 9 ? 5 : 6;
 
+const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_FILES     = 5;
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export const LateRegistrationPage = () => {
   const navigate    = useNavigate();
@@ -227,10 +230,6 @@ export const LateRegistrationPage = () => {
   const [dragOver,      setDragOver]      = useState(false);
   const [evidenceErr,   setEvidenceErr]   = useState('');
   const fileInputRef = useRef(null);
-
-  const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
-  const MAX_FILES     = 5;
 
   const processFiles = useCallback((files) => {
     setEvidenceErr('');
@@ -426,6 +425,7 @@ export const LateRegistrationPage = () => {
 
   // ── Payment ────────────────────────────────────────────────────────────────
   const handlePayment = () => {
+    setPayLoading(true);
     navigate('/course-payment', {
       state: {
         type: 'late',
@@ -686,19 +686,16 @@ YOUR ROLE
             </div>
             <div>
               <h2 className="text-base font-extrabold tracking-tight" style={{ color:'#1e3a5f' }}>DIU Portal</h2>
-              <p className="text-[10px] uppercase tracking-widest" style={{ color:'#464652' }}>Late Registration</p>
+              <p className="text-[10px] uppercase tracking-widest" style={{ color:'#464652' }}>Student</p>
             </div>
           </div>
         </div>
 
         <nav className="flex-grow space-y-0.5 px-2">
           {[
-            { icon:'dashboard',       label:'Dashboard',          action:() => navigate('/')                      },
-            { icon:'school',          label:'Course Registration', action:() => navigate('/course-registration')  },
-            { icon:'pending_actions', label:'Late Registration',  action:() => {},                  active:true   },
-            { icon:'military_tech',   label:'Grades',             action:() => {}                                 },
-            { icon:'calendar_month',  label:'Schedule',           action:() => {}                                 },
-            { icon:'menu_book',       label:'Library',            action:() => {}                                 },
+            { icon:'dashboard',       label:'Dashboard',           action:() => navigate('/'),                     active:false },
+            { icon:'school',          label:'Course Registration', action:() => navigate('/course-registration'),  active:false },
+            { icon:'pending_actions', label:'Late Registration',   action:() => navigate('/late-registration'),    active:true  },
           ].map(({ icon, label, action, active }) => (
             <button key={label} onClick={action}
               className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-all"
@@ -710,22 +707,6 @@ YOUR ROLE
             </button>
           ))}
         </nav>
-
-        <div className="mt-auto pt-4 px-2 space-y-0.5" style={{ borderTop:'1px solid #e2e8f0' }}>
-          {[
-            { icon:'person',          label:'My Profile', action:() => navigate('/profile') },
-            { icon:'contact_support', label:'Support',    action:() => {}                   },
-          ].map(({ icon, label, action }) => (
-            <button key={label} onClick={action}
-              className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-all"
-              style={{ color:'#475569' }}
-              onMouseEnter={e => { e.currentTarget.style.background='#f1f5f9'; e.currentTarget.style.color='#1e3a5f'; }}
-              onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#475569'; }}>
-              <span className="material-symbols-outlined text-xl">{icon}</span>
-              {label}
-            </button>
-          ))}
-        </div>
       </aside>
 
       {/* ── Main ────────────────────────────────────────────────────────────── */}

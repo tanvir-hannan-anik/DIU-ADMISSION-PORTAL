@@ -188,9 +188,9 @@ Your job:
       const reply = await callAdvisor(updated);
       setChatMsgs(p => [...p, { role: 'assistant', content: reply }]);
       // Check if we should show application form
-      const lower = (reply + text).toLowerCase();
+      const combined = (reply + text).toLowerCase();
       const wantsHelp = ['yes', 'help', 'problem', 'can\'t', 'cannot', 'afford', 'financial', 'difficulty', 'support', 'assist']
-        .some(k => text.toLowerCase().includes(k));
+        .some(k => combined.includes(k));
       if (wantsHelp && !advisorDone) {
         setTimeout(() => {
           setChatMsgs(p => [...p, {
@@ -688,7 +688,7 @@ Your job:
         )}
 
         {/* ── Stage: PARTIAL APPROVED ───────────────────────────── */}
-        {stage === S.PARTIAL_APPROVED && (
+        {isPartialApproved && (
           <div className="space-y-4">
             <div className="rounded-2xl p-6 text-center space-y-4" style={{ background: '#f0fdf4', border: '2px solid #bbf7d0' }}>
               <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"

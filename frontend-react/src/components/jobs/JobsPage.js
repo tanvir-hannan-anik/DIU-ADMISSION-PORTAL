@@ -6,7 +6,7 @@ import { useAI } from '../../hooks/useAI';
 import { authService } from '../../services/authService';
 import { loadCareerProfile } from '../student/ProfilePage';
 import { toast } from 'react-toastify';
-import API_CONFIG from '../../config/apiConfig';
+import { jobService } from '../../services/jobService';
 
 // ── Helpers ────────────────────────────────────────────────────────
 const PHOTO_KEY = (email) => `diu_photo_${email}`;
@@ -453,7 +453,6 @@ function JobsContent({ user, navigate }) {
   // Jobs state
   const [jobs, setJobs] = useState([]);
   const [jobsLoading, setJobsLoading] = useState(false);
-  const [jobsError, setJobsError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedJob, setSelectedJob] = useState(null);
   const [cvJob, setCvJob] = useState(null);
@@ -482,21 +481,16 @@ function JobsContent({ user, navigate }) {
   const fetchJobs = useCallback(async (term) => {
     const q = (term || career.techSkills.slice(0, 2).join(' ') || '').trim().toLowerCase();
     setJobsLoading(true);
-    setJobsError('');
     try {
-      const res = await fetch(
-        `${API_CONFIG.AI_BASE_URL}/api/v1/jobs/search?term=${encodeURIComponent(q)}`,
-        { signal: AbortSignal.timeout(6000) }
-      );
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-        setJobs(data.data);
+      const res = await jobService.searchJobs(q);
+      const items = res.data?.data ?? res.data;
+      if (Array.isArray(items) && items.length > 0) {
+        setJobs(items);
       } else {
         const filtered = filterFallback(q);
         setJobs(filtered.length > 0 ? filtered : FALLBACK_JOBS);
       }
     } catch {
-      // Backend offline — use local fallback silently
       const filtered = filterFallback(q);
       setJobs(filtered.length > 0 ? filtered : FALLBACK_JOBS);
     } finally {
@@ -636,7 +630,7 @@ End with:
                       <span>Profile strength</span><span className="font-bold text-white/80">{strengthPct}%</span>
                     </div>
                     <div className="w-full bg-white/15 rounded-full h-1.5">
-                      <div className="h-1.5 rounded-full bg-[#82f5c1] transition-all" style={{ width: `${strengthPct}%` }} />
+                      <div className="h-1.5 rounded-full transition-all" style={{ width: `${strengthPct}%`, backgroundColor: strengthColor }} />
                     </div>
                   </div>
                   <button onClick={() => navigate('/profile')}
@@ -949,7 +943,7 @@ End with:
             <p className="text-sm font-semibold text-slate-500">© 2025 DIU AI Career Hub — Empowering the next generation of talent.</p>
             <div className="flex gap-6">
               {['Privacy Policy','Terms of Service','University Portal','Contact'].map(l => (
-                <a key={l} href="#" className="text-slate-400 hover:text-[#0c1282] transition-colors text-sm font-medium">{l}</a>
+                <button key={l} type="button" className="text-slate-400 hover:text-[#0c1282] transition-colors text-sm font-medium bg-transparent border-none cursor-pointer">{l}</button>
               ))}
             </div>
           </div>

@@ -1,18 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { authService } from '../../services/authService';
 import { toast } from 'react-toastify';
 import { SmartAdvisorFullscreen } from './SmartAdvisorFullscreen';
 import API_CONFIG from '../../config/apiConfig';
 import axios from 'axios';
-
-const DIU_NOTIFICATIONS = [
-  { id:1, icon:'event',         title:'Registration Deadline',     body:'Spring 2026 course registration closes April 30', time:'2h ago',  unread:true,  color:'#0c1282' },
-  { id:2, icon:'payments',      title:'Fee Payment Reminder',      body:'Semester fee due by May 15, 2026',                time:'1d ago',  unread:true,  color:'#b45309' },
-  { id:3, icon:'menu_book',     title:'Course Material Available', body:'CIS222 lecture notes uploaded by faculty',        time:'2d ago',  unread:false, color:'#166534' },
-  { id:4, icon:'campaign',      title:'Academic Calendar Update',  body:'Mid-term exams scheduled: June 10–20, 2026',      time:'3d ago',  unread:false, color:'#7c3aed' },
-  { id:5, icon:'local_library', title:'Library Book Due',          body:'Return "Data Structures" before April 20',        time:'4d ago',  unread:false, color:'#ba1a1a' },
-];
+import { Navigation } from '../common/Navigation';
 
 // ── Fee constants ─────────────────────────────────────────────────────────────
 const FEE_PER_CREDIT = 30000 / 11;
@@ -306,9 +298,6 @@ async function callDeepSeek(msgs, sys) {
 export const CourseRegistrationPage = () => {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const user      = authService.getUser();
-  const photo    = user ? localStorage.getItem(`diu_photo_${user.email}`) : null;
-  const initials = user?.name ? user.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : 'ST';
 
   // course state
   const [selSem,    setSelSem]    = useState('Semester 5');
@@ -340,20 +329,6 @@ export const CourseRegistrationPage = () => {
   const [pickerType,    setPickerType]    = useState('regular');
   const [pickerSearch,  setPickerSearch]  = useState('');
 
-  // search dropdown + notifications
-  const [showSearchDrop, setShowSearchDrop] = useState(false);
-  const [showNotifs,     setShowNotifs]     = useState(false);
-  const notifsRef = useRef(null);
-  const searchRef = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (notifsRef.current && !notifsRef.current.contains(e.target)) setShowNotifs(false);
-      if (searchRef.current && !searchRef.current.contains(e.target)) setShowSearchDrop(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior:'smooth' }); }, [chatMsgs]);
 
@@ -457,6 +432,7 @@ export const CourseRegistrationPage = () => {
   const handlePayment = () => {
     if (!cart.length)               { toast.error('Select at least one course');              return; }
     if (fees.totalCr < MIN_CREDITS) { toast.error(`Minimum ${MIN_CREDITS} credits required`); return; }
+    setPayLoading(true);
     navigate('/course-payment', {
       state: {
         type: 'course',
@@ -565,154 +541,11 @@ YOUR ROLE
   return (
     <div className="min-h-screen font-headline" style={{ background:'#f7f9fb', color:'#191c1e', fontFamily:'Manrope, sans-serif' }}>
 
-      {/* ── Top App Bar ──────────────────────────────────────────── */}
-      <header className="fixed top-0 w-full z-40 flex justify-between items-center px-6 h-16"
-              style={{ background:'rgba(247,249,251,0.85)', backdropFilter:'blur(12px)', boxShadow:'0 1px 3px rgba(0,0,0,0.08)' }}>
-        <div className="flex items-center gap-4">
-          <img src="/diulogo.png" alt="Daffodil International University"
-               className="h-9 w-auto cursor-pointer" onClick={() => navigate('/')} />
-          {/* ── Inline search with dropdown ───────────────────────── */}
-          <div className="hidden md:flex relative" ref={searchRef}>
-            <div className="flex items-center px-3 py-1.5 rounded-full gap-1" style={{ background:'#e6e8ea' }}>
-              <span className="material-symbols-outlined text-sm" style={{ color:'#464652' }}>search</span>
-              <input
-                placeholder="Search courses..."
-                className="bg-transparent border-none outline-none text-sm w-44"
-                style={{ color:'#191c1e' }}
-                value={pickerSearch}
-                onChange={e => { setPickerSearch(e.target.value); setShowSearchDrop(e.target.value.length > 0); }}
-                onFocus={() => { if (pickerSearch.length > 0) setShowSearchDrop(true); }}
-              />
-              {pickerSearch && (
-                <button onClick={() => { setPickerSearch(''); setShowSearchDrop(false); }} style={{ color:'#464652' }}>
-                  <span className="material-symbols-outlined text-sm leading-none">close</span>
-                </button>
-              )}
-            </div>
-            {/* Dropdown results */}
-            {showSearchDrop && pickerSearch.length > 0 && (
-              <div className="absolute top-full left-0 mt-2 w-80 rounded-2xl shadow-2xl overflow-hidden z-50"
-                   style={{ background:'white', border:'1px solid #e2e8f0' }}>
-                <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom:'1px solid #f1f5f9' }}>
-                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color:'#94a3b8' }}>Course Results</span>
-                  <span className="text-xs" style={{ color:'#94a3b8' }}>{pickerList.length} found</span>
-                </div>
-                <div className="max-h-64 overflow-y-auto">
-                  {pickerList.length === 0
-                    ? <p className="text-center py-6 text-sm" style={{ color:'#94a3b8' }}>No courses match "{pickerSearch}"</p>
-                    : pickerList.slice(0, 8).map(course => {
-                      const missing = getMissingPrereqs(course.course_code, completedCodes);
-                      const isLocked = missing.length > 0;
-                      return (
-                        <button key={course.course_code}
-                          onClick={() => { addCourse(course, 'regular'); if (!isLocked) { setPickerSearch(''); setShowSearchDrop(false); } }}
-                          className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors"
-                          style={{ borderBottom:'1px solid #f8fafc' }}
-                          onMouseEnter={e => e.currentTarget.style.background= isLocked ? '#fff7ed' : '#f8fafc'}
-                          onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                          <div className="min-w-0 flex-1 mr-3">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-sm font-bold" style={{ color: isLocked ? '#dc2626' : '#0c1282' }}>{course.course_code}</span>
-                              <span className="text-xs px-1.5 py-0.5 rounded font-bold" style={{ background:'#eff6ff', color:'#1e40af' }}>{course.credits} cr</span>
-                            </div>
-                            <p className="text-xs truncate mt-0.5" style={{ color:'#64748b' }}>{course.subject}</p>
-                            {isLocked && (
-                              <p className="text-[10px] font-semibold mt-0.5" style={{ color:'#b45309' }}>
-                                Needs: {missing.join(', ')}
-                              </p>
-                            )}
-                          </div>
-                          <span className="material-symbols-outlined text-sm flex-shrink-0"
-                                style={{ color: isLocked ? '#dc2626' : '#94a3b8', fontVariationSettings:"'FILL' 1" }}>
-                            {isLocked ? 'lock' : 'add_circle'}
-                          </span>
-                        </button>
-                      );
-                    })
-                  }
-                </div>
-                {pickerList.length > 8 && (
-                  <div className="px-4 py-2.5" style={{ borderTop:'1px solid #f1f5f9' }}>
-                    <button className="text-xs font-bold w-full text-center" style={{ color:'#0c1282' }}
-                      onClick={() => { setShowPicker(true); setPickerType('regular'); setShowSearchDrop(false); }}>
-                      View all {pickerList.length} results →
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold" style={{ background:'#d5e3fc', color:'#0d1c2e' }}>
-            <span className="material-symbols-outlined text-sm">event_note</span>
-            SPRING SEMESTER 2026
-          </div>
-          {/* ── Notification bell with dropdown ───────────────────── */}
-          <div className="relative" ref={notifsRef}>
-            <button className="p-2 rounded-full relative hover:bg-slate-100 transition-colors"
-                    style={{ color:'#464652' }}
-                    onClick={() => setShowNotifs(v => !v)}>
-              <span className="material-symbols-outlined">notifications</span>
-              {DIU_NOTIFICATIONS.some(n => n.unread) && (
-                <span className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ background:'#ba1a1a' }}></span>
-              )}
-            </button>
-            {showNotifs && (
-              <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl shadow-2xl z-50 overflow-hidden"
-                   style={{ background:'white', border:'1px solid #e2e8f0' }}>
-                <div className="flex items-center justify-between px-4 py-3.5" style={{ borderBottom:'1px solid #f1f5f9' }}>
-                  <span className="font-bold text-sm" style={{ color:'#1e293b' }}>Notifications</span>
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background:'#eff6ff', color:'#0c1282' }}>
-                    {DIU_NOTIFICATIONS.filter(n => n.unread).length} new
-                  </span>
-                </div>
-                <div className="max-h-80 overflow-y-auto">
-                  {DIU_NOTIFICATIONS.map(n => (
-                    <div key={n.id}
-                         className="flex items-start gap-3 px-4 py-3.5 cursor-pointer transition-colors"
-                         style={{ borderBottom:'1px solid #f8fafc', background: n.unread ? '#f0f6ff' : 'transparent' }}
-                         onMouseEnter={e => e.currentTarget.style.background='#f8fafc'}
-                         onMouseLeave={e => e.currentTarget.style.background= n.unread ? '#f0f6ff' : 'transparent'}>
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                           style={{ background: n.color + '18' }}>
-                        <span className="material-symbols-outlined text-sm" style={{ color: n.color, fontVariationSettings:"'FILL' 1" }}>{n.icon}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-bold truncate" style={{ color:'#1e293b' }}>{n.title}</p>
-                          {n.unread && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background:'#3b82f6' }}></span>}
-                        </div>
-                        <p className="text-xs mt-0.5" style={{ color:'#64748b' }}>{n.body}</p>
-                        <p className="text-[10px] mt-1" style={{ color:'#94a3b8' }}>{n.time}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="px-4 py-3 text-center" style={{ borderTop:'1px solid #f1f5f9' }}>
-                  <button className="text-xs font-bold" style={{ color:'#0c1282' }}>Mark all as read</button>
-                </div>
-              </div>
-            )}
-          </div>
-          <button className="p-2 rounded-full hover:bg-slate-100 transition-colors" style={{ color:'#464652' }}
-                  onClick={() => navigate('/profile')}>
-            <span className="material-symbols-outlined">apps</span>
-          </button>
-          <div onClick={() => navigate('/profile')}
-               className="w-8 h-8 rounded-full overflow-hidden border-2 cursor-pointer"
-               style={{ borderColor:'#0c1282' }}>
-            {photo
-              ? <img src={photo} alt="Profile" className="w-full h-full object-cover" />
-              : <div className="w-full h-full flex items-center justify-center text-xs font-black text-white" style={{ background:'#0c1282' }}>{initials}</div>
-            }
-          </div>
-        </div>
-      </header>
+      <Navigation />
 
-      {/* ── Side Nav ─────────────────────────────────────────────── */}
-      <aside className="fixed left-0 top-0 h-full w-64 z-30 flex flex-col py-4 pt-20 hidden lg:flex"
-             style={{ background:'#f8fafc', borderRight:'1px solid #e2e8f0' }}>
+      {/* ── Side Nav ──────────────────────────────────────────────── */}
+      <aside className="fixed left-0 top-0 h-full w-64 z-30 flex-col py-4 pt-20 hidden lg:flex"
+        style={{ background:'#f8fafc', borderRight:'1px solid #e2e8f0' }}>
         <div className="px-6 mb-8">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background:'#0c1282' }}>
@@ -720,55 +553,31 @@ YOUR ROLE
             </div>
             <div>
               <h2 className="text-base font-extrabold tracking-tight" style={{ color:'#1e3a5f' }}>DIU Portal</h2>
-              <p className="text-[10px] uppercase tracking-widest" style={{ color:'#464652' }}>Academic Archives</p>
+              <p className="text-[10px] uppercase tracking-widest" style={{ color:'#464652' }}>Student</p>
             </div>
           </div>
         </div>
-
         <nav className="flex-grow space-y-0.5 px-2">
           {[
-            { icon:'dashboard',       label:'Dashboard',         action:() => navigate('/')                      },
-            { icon:'school',          label:'Course Registration',action:() => {},                  active:true  },
-            { icon:'pending_actions', label:'Late Registration',  action:() => navigate('/late-registration')    },
-            { icon:'military_tech',   label:'Grades',             action:() => {}                                },
-            { icon:'calendar_month',  label:'Schedule',           action:() => {}                                },
-            { icon:'menu_book',       label:'Library',            action:() => {}                                },
+            { icon:'dashboard',       label:'Dashboard',          action:() => navigate('/'),                       active:false },
+            { icon:'school',          label:'Course Registration', action:() => navigate('/course-registration'),   active:true  },
+            { icon:'pending_actions', label:'Late Registration',   action:() => navigate('/late-registration'),     active:false },
           ].map(({ icon, label, action, active }) => (
             <button key={label} onClick={action}
               className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-all"
-              style={active
-                ? { background:'#eff6ff', color:'#1e3a5f' }
-                : { color:'#475569' }}
+              style={active ? { background:'#ffdad6', color:'#ba1a1a' } : { color:'#475569' }}
               onMouseEnter={e => { if (!active) { e.currentTarget.style.background='#f1f5f9'; e.currentTarget.style.color='#1e3a5f'; } }}
-              onMouseLeave={e => { if (!active) { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#475569'; } }}
-            >
-              <span className="material-symbols-outlined text-xl"
-                    style={active ? { fontVariationSettings:"'FILL' 1" } : {}}>{icon}</span>
+              onMouseLeave={e => { if (!active) { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#475569'; } }}>
+              <span className="material-symbols-outlined text-xl" style={active ? { fontVariationSettings:"'FILL' 1" } : {}}>{icon}</span>
               {label}
             </button>
           ))}
         </nav>
-
-        <div className="mt-auto pt-4 px-2 space-y-0.5" style={{ borderTop:'1px solid #e2e8f0' }}>
-          {[
-            { icon:'person', label:'My Profile', action:() => navigate('/profile') },
-            { icon:'contact_support', label:'Support', action:() => {} },
-          ].map(({ icon, label, action }) => (
-            <button key={label} onClick={action}
-              className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-all"
-              style={{ color:'#475569' }}
-              onMouseEnter={e => { e.currentTarget.style.background='#f1f5f9'; e.currentTarget.style.color='#1e3a5f'; }}
-              onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#475569'; }}>
-              <span className="material-symbols-outlined text-xl">{icon}</span>
-              {label}
-            </button>
-          ))}
-        </div>
       </aside>
 
       {/* ── Main Canvas ──────────────────────────────────────────── */}
-      <main className="pt-16 min-h-screen pb-20 lg:pb-0" style={{ marginLeft:'0', paddingLeft:'0' }}>
-        <div className="lg:ml-64 p-4 md:p-6 lg:p-8">
+      <main className="pt-16 min-h-screen pb-4 lg:ml-64">
+        <div className="p-4 md:p-6 lg:p-8">
 
           {/* Late Registration Alert */}
           <div className="mb-8 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-l-4"
@@ -1332,27 +1141,8 @@ YOUR ROLE
         </div>
       )}
 
-      {/* ── Mobile Bottom Nav ─────────────────────────────────────── */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-2 py-2 border-t border-slate-200"
-           style={{ background: 'white', boxShadow: '0 -2px 12px rgba(0,0,0,0.06)' }}>
-        {[
-          { icon: 'home',            label: 'Home',      action: () => navigate('/') },
-          { icon: 'school',          label: 'Courses',   action: () => {}, active: true },
-          { icon: 'pending_actions', label: 'Late Reg',  action: () => navigate('/late-registration') },
-          { icon: 'account_circle',  label: 'Profile',   action: () => navigate('/profile') },
-        ].map(({ icon, label, action, active }) => (
-          <button key={label} onClick={action}
-            className="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-colors"
-            style={{ color: active ? '#0c1282' : '#94a3b8' }}>
-            <span className="material-symbols-outlined text-xl"
-                  style={active ? { fontVariationSettings: "'FILL' 1" } : {}}>{icon}</span>
-            <span className="text-[9px] font-bold uppercase tracking-wide">{label}</span>
-          </button>
-        ))}
-      </nav>
-
       {/* ── Floating Smart Advisor Button ─────────────────────────── */}
-      <div className="fixed bottom-16 lg:bottom-8 right-6 z-50">
+      <div className="fixed bottom-8 right-6 z-50">
         <button onClick={() => setChatOpen(v => !v)}
           className="w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 active:scale-90 relative group"
           style={{ background:'#0c1282', boxShadow:'0 4px 20px rgba(12,18,130,0.4)' }}>
