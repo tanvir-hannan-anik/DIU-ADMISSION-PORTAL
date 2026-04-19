@@ -1,3 +1,8 @@
+databases:
+  - name: diu-db
+    databaseName: university_automation
+    plan: free
+
 services:
   # ── Python AI Microservice ───────────────────────────────────────────────────
   - type: web
@@ -32,12 +37,28 @@ services:
     runtime: docker
     dockerfilePath: backend-spring-boot/Dockerfile
     envVars:
-      - key: DB_URL
-        sync: false
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: DB_HOST
+        fromDatabase:
+          name: diu-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: diu-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: diu-db
+          property: database
       - key: DB_USERNAME
-        sync: false
+        fromDatabase:
+          name: diu-db
+          property: user
       - key: DB_PASSWORD
-        sync: false
+        fromDatabase:
+          name: diu-db
+          property: password
       - key: JWT_SECRET
         sync: false
       - key: PYTHON_SERVICE_URL

@@ -1,19 +1,19 @@
 version: '3.8'
 
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: diu_mysql
+  postgres:
+    image: postgres:16-alpine
+    container_name: diu_postgres
     environment:
-      MYSQL_ROOT_PASSWORD: "diu@321.bd.anik"
-      MYSQL_DATABASE: university_automation
+      POSTGRES_DB: university_automation
+      POSTGRES_USER: diu_user
+      POSTGRES_PASSWORD: diu@321.bd
     ports:
-      - "3307:3306"
+      - "5432:5432"
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pdiu@321.bd.anik"]
+      test: ["CMD-SHELL", "pg_isready -U diu_user -d university_automation"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,8 +26,6 @@ services:
     env_file: ./backend-python/.env
     ports:
       - "5000:5000"
-    depends_on:
-      - mysql
     networks:
       - diu-net
     restart: unless-stopped
@@ -38,18 +36,19 @@ services:
       dockerfile: backend-spring-boot/Dockerfile
     container_name: diu_spring_boot
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/university_automation?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: "diu@321.bd.anik"
-      SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
-      SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.MySQLDialect
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: university_automation
+      DB_USERNAME: diu_user
+      DB_PASSWORD: diu@321.bd
       PYTHON_SERVICE_URL: http://python-service:5000
       CORS_ALLOWED_ORIGINS: http://localhost:3000
+      JWT_SECRET: diu-local-dev-secret-key-2024-must-be-at-least-32-chars
     ports:
       - "8080:8080"
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       python-service:
         condition: service_started
@@ -69,7 +68,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  mysql_data:
+  postgres_data:
 
 networks:
   diu-net:
