@@ -32,6 +32,14 @@ services:
     runtime: docker
     dockerfilePath: backend-spring-boot/Dockerfile
     envVars:
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
       - key: PYTHON_SERVICE_URL
         fromService:
           name: diu-ai-service
@@ -42,8 +50,6 @@ services:
           name: diu-frontend
           type: web
           property: host
-      - key: JWT_SECRET
-        sync: false
       - key: MAIL_USERNAME
         sync: false
       - key: MAIL_PASSWORD
