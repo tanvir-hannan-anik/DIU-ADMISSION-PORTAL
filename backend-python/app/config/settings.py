@@ -11,6 +11,7 @@ _PROJECT_ROOT = os.path.dirname(_BASE_DIR)
 class Config:
     GROQ_API_KEY = os.getenv('GROQ_API_KEY')
     GROQ_MODEL = os.getenv('GROQ_MODEL', 'llama-3.3-70b-versatile')
+    RAPIDAPI_KEY = os.getenv('RAPIDAPI_KEY')
     GROQ_VISION_MODEL = os.getenv('GROQ_VISION_MODEL', 'meta-llama/llama-4-scout-17b-16e-instruct')
     GROQ_API_KEY_2 = os.getenv('GROQ_API_KEY_2')
     GROQ_MODEL_2 = os.getenv('GROQ_MODEL_2', 'llama-3.3-70b-versatile')

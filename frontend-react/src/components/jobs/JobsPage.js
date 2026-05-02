@@ -457,6 +457,11 @@ function JobsContent({ user, navigate }) {
   const [selectedJob, setSelectedJob] = useState(null);
   const [cvJob, setCvJob] = useState(null);
 
+  // Live external jobs (JSearch API)
+  const [externalJobs, setExternalJobs] = useState([]);
+  const [externalLoading, setExternalLoading] = useState(false);
+  const [externalError, setExternalError] = useState('');
+
   // Career roadmap state
   const [roadmap, setRoadmap] = useState('');
   const [roadmapLoading, setRoadmapLoading] = useState(false);
@@ -497,6 +502,37 @@ function JobsContent({ user, navigate }) {
       setJobsLoading(false);
     }
   }, [career.techSkills, filterFallback]);
+
+  // ── Fetch live external jobs (JSearch via Flask proxy) ───────
+  const fetchExternalJobs = useCallback(async (term) => {
+    const keyword = (term || '').trim();
+    if (!keyword) return;
+    setExternalLoading(true);
+    setExternalError('');
+    setExternalJobs([]);
+    try {
+      const res = await jobService.searchExternalJobs(keyword);
+      const items = res.data?.data ?? [];
+      if (items.length === 0) {
+        setExternalError('No live jobs found for this search. Try a broader keyword.');
+      } else {
+        setExternalJobs(items);
+      }
+    } catch (err) {
+      const code = err.response?.data?.errorCode;
+      if (code === 'RATE_LIMIT') {
+        setExternalError('Live job search limit reached. Please try again in a moment.');
+      } else if (code === 'SERVICE_NOT_CONFIGURED') {
+        setExternalError('Live job search is not configured yet.');
+      } else if (code === 'NOT_SUBSCRIBED') {
+        setExternalError('Live job search requires a JSearch API subscription on RapidAPI.');
+      } else {
+        setExternalError('Could not load live jobs. Showing local results only.');
+      }
+    } finally {
+      setExternalLoading(false);
+    }
+  }, []);
 
   // ── Generate roadmap ─────────────────────────────────────────
   const generateRoadmap = async () => {
@@ -647,10 +683,10 @@ End with:
             <div className="relative max-w-3xl">
               <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 text-2xl">search</span>
               <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && fetchJobs(searchTerm)}
+                onKeyDown={e => { if (e.key === 'Enter') { fetchJobs(searchTerm); fetchExternalJobs(searchTerm); } }}
                 placeholder={career.techSkills[0] ? `Search jobs — try "${career.techSkills[0]} Developer"` : 'Search for jobs, companies, or skills...'}
                 className="w-full bg-white border-none shadow-[0_12px_32px_rgba(23,28,31,0.06)] rounded-2xl py-5 pl-14 pr-32 text-base focus:outline-none focus:ring-2 focus:ring-[#0c1282]/30 transition-all" />
-              <button onClick={() => fetchJobs(searchTerm)} disabled={jobsLoading}
+              <button onClick={() => { fetchJobs(searchTerm); fetchExternalJobs(searchTerm); }} disabled={jobsLoading || externalLoading}
                 className="absolute right-2 top-1/2 -translate-y-1/2 px-5 py-2.5 bg-[#0c1282] text-white font-bold rounded-xl text-sm hover:bg-[#0c1282]/90 disabled:opacity-60 transition-all flex items-center gap-1.5">
                 {jobsLoading
                   ? <><span className="material-symbols-outlined text-base animate-spin">autorenew</span>Searching…</>
@@ -661,7 +697,7 @@ End with:
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-extrabold text-slate-400 uppercase tracking-widest mr-1">Top Skills:</span>
                 {career.techSkills.slice(0, 7).map((s, i) => (
-                  <button key={s} onClick={() => { setSearchTerm(s); fetchJobs(s); }}
+                  <button key={s} onClick={() => { setSearchTerm(s); fetchJobs(s); fetchExternalJobs(s); }}
                     className={`px-4 py-1.5 rounded-full font-semibold text-sm transition-all ${i === 0 ? 'bg-[#0c1282] text-white hover:opacity-90' : 'bg-[#e4e9ed] text-[#454654] hover:bg-[#dfe0ff] hover:text-[#0c1282]'}`}>
                     {s}
                   </button>
@@ -797,6 +833,76 @@ End with:
                     })}
                   </div>
                 </>
+              )}
+
+              {/* ── Live Jobs from JSearch API ─────────────────────── */}
+              {(externalLoading || externalError || externalJobs.length > 0) && (
+                <div className="mt-10 space-y-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-slate-200" />
+                    <div className="flex items-center gap-2 px-4 py-1.5 bg-[#0c1282]/5 rounded-full">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-xs font-extrabold text-[#0c1282] uppercase tracking-widest">Live Jobs</span>
+                    </div>
+                    <div className="flex-1 h-px bg-slate-200" />
+                  </div>
+
+                  {externalLoading && (
+                    <div className="flex items-center justify-center gap-3 py-12 bg-white rounded-2xl shadow-[0_8px_24px_rgba(23,28,31,0.05)]">
+                      <span className="material-symbols-outlined text-2xl text-[#0c1282] animate-spin">autorenew</span>
+                      <span className="text-slate-500 font-semibold">Searching live job market…</span>
+                    </div>
+                  )}
+
+                  {!externalLoading && externalError && (
+                    <div className="flex items-center gap-3 px-5 py-4 bg-amber-50 border border-amber-200 rounded-xl">
+                      <span className="material-symbols-outlined text-amber-500">info</span>
+                      <span className="text-sm text-amber-700 font-medium">{externalError}</span>
+                    </div>
+                  )}
+
+                  {!externalLoading && externalJobs.length > 0 && (
+                    <>
+                      <p className="text-sm font-semibold text-slate-500">{externalJobs.length} live jobs found worldwide</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        {externalJobs.map((job, idx) => (
+                          <div key={idx}
+                            className="bg-white rounded-2xl p-6 shadow-[0_8px_24px_rgba(23,28,31,0.06)] hover:shadow-xl transition-all duration-300 flex flex-col gap-4 border border-slate-100">
+                            {/* Header */}
+                            <div className="flex items-start gap-4">
+                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#001eb4]/10 to-[#0c1282]/5 flex items-center justify-center flex-shrink-0">
+                                <span className="material-symbols-outlined text-[#0c1282] text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>work</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-base font-extrabold text-[#171c1f] leading-snug truncate">{job.job_title}</h3>
+                                <p className="text-sm font-semibold text-slate-500 mt-0.5 truncate">{job.employer_name || 'Company'}</p>
+                                <div className="flex items-center gap-1 text-slate-400 text-xs mt-0.5">
+                                  <span className="material-symbols-outlined text-xs">location_on</span>
+                                  <span className="truncate">{job.job_location || `${job.job_city || ''} ${job.job_country || ''}`.trim() || 'Remote'}</span>
+                                </div>
+                              </div>
+                              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-extrabold rounded-full whitespace-nowrap flex-shrink-0">LIVE</span>
+                            </div>
+
+                            {/* Apply */}
+                            {job.job_apply_link ? (
+                              <a href={job.job_apply_link} target="_blank" rel="noopener noreferrer"
+                                className="w-full py-3 bg-gradient-to-r from-[#001eb4] to-[#0c1282] text-white rounded-xl font-extrabold text-sm text-center hover:opacity-90 transition-all shadow-md shadow-[#0c1282]/20 flex items-center justify-center gap-2">
+                                <span className="material-symbols-outlined text-base">open_in_new</span>
+                                Apply Now
+                              </a>
+                            ) : (
+                              <button disabled
+                                className="w-full py-3 bg-slate-100 text-slate-400 rounded-xl font-bold text-sm cursor-not-allowed">
+                                Apply Link Unavailable
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
             </div>
           )}

@@ -15,7 +15,7 @@ services:
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL
-        value: llama-3.1-8b-instant
+        value: llama-3.3-70b-versatile
       - key: GROQ_API_KEY_2
         sync: false
       - key: GROQ_MODEL_2
@@ -24,12 +24,14 @@ services:
         sync: false
       - key: GROQ_MODEL_3
         value: llama-3.3-70b-versatile
+      - key: RAPIDAPI_KEY
+        sync: false
       - key: FLASK_ENV
         value: production
       - key: LOG_LEVEL
         value: INFO
       - key: MAX_TOKENS
-        value: "1024"
+        value: "2048"
 
   # ── Spring Boot API ──────────────────────────────────────────────────────────
   - type: web

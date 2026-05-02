@@ -1,8 +1,13 @@
 from flask import Blueprint, request, jsonify
 import logging
+import requests as http_requests
+from app.config.settings import Config
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
+
+_JSEARCH_HOST = 'jsearch.p.rapidapi.com'
+_JSEARCH_URL  = f'https://{_JSEARCH_HOST}/search'
 
 _MOCK_JOBS = [
     {
@@ -131,6 +136,68 @@ def search_jobs():
         )
     ]
     return jsonify({'success': True, 'data': filtered, 'count': len(filtered), 'term': term}), 200
+
+
+@bp.route('/external', methods=['GET'])
+def external_jobs():
+    keyword  = (request.args.get('keyword',  '') or '').strip()
+    location = (request.args.get('location', '') or '').strip() or 'Bangladesh'
+
+    if not keyword:
+        return jsonify({'success': False, 'message': 'keyword is required', 'errorCode': 'VALIDATION_ERROR'}), 400
+
+    api_key = Config.RAPIDAPI_KEY
+    if not api_key or api_key == 'your_rapidapi_key_here':
+        return jsonify({'success': False, 'message': 'Job search API not configured', 'errorCode': 'SERVICE_NOT_CONFIGURED'}), 503
+
+    try:
+        resp = http_requests.get(
+            _JSEARCH_URL,
+            params={'query': f'{keyword} in {location}', 'num_pages': '1', 'page': '1', 'date_posted': 'month'},
+            headers={'X-RapidAPI-Key': api_key, 'X-RapidAPI-Host': _JSEARCH_HOST},
+            timeout=12,
+        )
+
+        if resp.status_code == 429:
+            return jsonify({'success': False, 'message': 'Rate limit reached. Please try again in a moment.', 'errorCode': 'RATE_LIMIT'}), 429
+
+        if resp.status_code in (401, 403):
+            logger.error(f'JSearch API auth error: {resp.status_code} {resp.text[:200]}')
+            return jsonify({'success': False, 'message': 'Job search API subscription required. Please subscribe to JSearch on RapidAPI.', 'errorCode': 'NOT_SUBSCRIBED'}), 403
+
+        if not resp.ok:
+            logger.error(f'JSearch API error: {resp.status_code} {resp.text[:200]}')
+            return jsonify({'success': False, 'message': 'External job search unavailable', 'errorCode': 'UPSTREAM_ERROR'}), 502
+
+        raw_jobs = resp.json().get('data', [])
+
+        # Keyword relevance filter — title or first 400 chars of description must contain keyword
+        kw_lower = keyword.lower()
+        results = []
+        for job in raw_jobs:
+            title = (job.get('job_title') or '').strip()
+            desc_snippet = (job.get('job_description') or '')[:400].lower()
+            if kw_lower not in title.lower() and kw_lower not in desc_snippet:
+                continue
+            city    = job.get('job_city')    or ''
+            country = job.get('job_country') or ''
+            results.append({
+                'job_title':      title,
+                'employer_name':  (job.get('employer_name') or '').strip(),
+                'job_city':       city,
+                'job_country':    country,
+                'job_location':   ', '.join(filter(None, [city, country])) or location,
+                'job_apply_link': job.get('job_apply_link') or job.get('job_google_link') or '',
+            })
+
+        logger.info(f'External jobs: keyword="{keyword}" location="{location}" raw={len(raw_jobs)} filtered={len(results)}')
+        return jsonify({'success': True, 'data': results, 'count': len(results), 'keyword': keyword, 'location': location}), 200
+
+    except http_requests.Timeout:
+        return jsonify({'success': False, 'message': 'Job search timed out. Please try again.', 'errorCode': 'TIMEOUT'}), 504
+    except Exception as e:
+        logger.error(f'External jobs error: {e}')
+        return jsonify({'success': False, 'message': 'Failed to fetch external jobs', 'errorCode': 'INTERNAL_ERROR'}), 500
 
 
 @bp.route('/health', methods=['GET'])
