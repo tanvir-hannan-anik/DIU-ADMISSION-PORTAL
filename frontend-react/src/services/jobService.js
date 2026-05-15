@@ -3,7 +3,7 @@ import API_CONFIG from '../config/apiConfig';
 import axios from 'axios';
 
 // Uses Spring Boot (MySQL-backed). Falls back to Python AI service if unavailable.
-const aiApi = axios.create({ baseURL: API_CONFIG.AI_URL, timeout: API_CONFIG.TIMEOUT });
+const aiApi = axios.create({ baseURL: API_CONFIG.AI_BASE_URL, timeout: API_CONFIG.TIMEOUT });
 
 // Direct client for Python Flask service (external jobs proxy — API key stays server-side)
 const flaskApi = axios.create({ baseURL: API_CONFIG.AI_BASE_URL, timeout: 15000 });

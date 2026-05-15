@@ -44,6 +44,7 @@ const DEFAULT_SEMESTERS = {
     { course_code:'CIS132',  subject:'Algorithms',                                  faculty:'Mr. Md. Mehedi Hassan'               },
     { course_code:'CIS132L', subject:'Algorithms Lab',                              faculty:'Mr. Md. Mehedi Hassan'               },
     { course_code:'CIS123',  subject:'Discrete Mathematics',                        faculty:'Mr. Md. Biplob Hossain'              },
+    { course_code:'MAT201',  subject:'Mathematics-II',                              faculty:'Mathematics Department'              },
   ],
   'Semester 4': [
     { course_code:'CIS232',  subject:'Object Oriented Programming',                 faculty:'Mr. Md. Nasimul Kader'               },
@@ -79,6 +80,29 @@ const DEFAULT_SEMESTERS = {
     { course_code:'IoT429',  subject:'Machine Learning for IoT',                    faculty:'Mr. Md. Faruk Hosen'                 },
     { course_code:'CIS435',  subject:'Cloud Computing',                             faculty:'Mr. Md. Biplob Hossain'              },
     { course_code:'CIS435L', subject:'Cloud Computing Lab',                         faculty:'Mr. Md. Biplob Hossain'              },
+  ],
+  'Semester 9': [
+    { course_code:'CIS331',  subject:'Cybersecurity and Network Security',          faculty:'Mr. Md. Biplob Hossain'              },
+    { course_code:'CIS332',  subject:'Human-Computer Interaction',                  faculty:'Ms. Sonia Nasrin'                    },
+    { course_code:'CIS333',  subject:'Mobile Application Development',              faculty:'Mr. Israfil'                         },
+    { course_code:'CIS333L', subject:'Mobile Application Development Lab',          faculty:'Mr. Israfil'                         },
+  ],
+  'Semester 10': [
+    { course_code:'CIS421',  subject:'Big Data and Analytics',                      faculty:'Mr. Md. Mehedi Hassan'               },
+    { course_code:'CIS421L', subject:'Big Data and Analytics Lab',                  faculty:'Mr. Md. Mehedi Hassan'               },
+    { course_code:'CIS422',  subject:'Software Project Management',                 faculty:'Mr. Md. Sarwar Hossain Mollah'       },
+    { course_code:'CIS423',  subject:'E-Commerce and Digital Business',             faculty:'Finance Department'                  },
+  ],
+  'Semester 11': [
+    { course_code:'CIS424',  subject:'Advanced AI and Deep Learning',               faculty:'Mr. Md. Faruk Hosen'                 },
+    { course_code:'CIS424L', subject:'Advanced AI and Deep Learning Lab',           faculty:'Mr. Md. Faruk Hosen'                 },
+    { course_code:'CIS425',  subject:'Blockchain and Distributed Systems',          faculty:'Mr. Md. Biplob Hossain'              },
+    { course_code:'CIS426',  subject:'Research Methodology in Computing',           faculty:'Dr. Mohammed Nadir Bin Ali'          },
+  ],
+  'Semester 12': [
+    { course_code:'CIS497',  subject:'Technical Seminar and Presentation',          faculty:'Mr. Md. Sarwar Hossain Mollah'       },
+    { course_code:'CIS498',  subject:'Industrial Internship',                       faculty:'Mr. Md. Sarwar Hossain Mollah'       },
+    { course_code:'CIS499',  subject:'Thesis / Capstone Project',                   faculty:'Mr. Md. Sarwar Hossain Mollah'       },
   ],
 };
 

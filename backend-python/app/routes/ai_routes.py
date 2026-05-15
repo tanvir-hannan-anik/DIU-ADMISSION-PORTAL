@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 import logging
-from app.services.groq_service import GroqService
+from app.services.groq_service import GroqService, ANSWER_FORMAT_RULES
+from app.services import rag_service
 from app.config.settings import Config
 
 logger = logging.getLogger(__name__)
@@ -92,7 +93,7 @@ def smart_advisor():
             return jsonify({'success': False, 'message': 'Advisor client not initialised'}), 503
 
         # Build messages for Groq
-        groq_messages = [{'role': 'system', 'content': system_prompt}]
+        groq_messages = [{'role': 'system', 'content': system_prompt + "\n\n" + ANSWER_FORMAT_RULES}]
         for m in messages[-12:]:                          # keep last 12 for context
             role = m.get('role', 'user')
             if role in ('user', 'assistant'):
@@ -139,7 +140,7 @@ def smart_proctor():
         if proctor_client is None or proctor_model is None:
             return jsonify({'success': False, 'message': 'Proctor client not initialised'}), 503
 
-        groq_messages = [{'role': 'system', 'content': system_prompt}]
+        groq_messages = [{'role': 'system', 'content': system_prompt + "\n\n" + ANSWER_FORMAT_RULES}]
         for m in messages[-16:]:
             role = m.get('role', 'user')
             if role in ('user', 'assistant'):
@@ -190,7 +191,7 @@ def vision_analysis():
         )
         vision_model = Config.GROQ_VISION_MODEL
 
-        groq_messages = [{'role': 'system', 'content': system_prompt}]
+        groq_messages = [{'role': 'system', 'content': system_prompt + "\n\n" + ANSWER_FORMAT_RULES}]
         for m in messages[:-1]:
             role = m.get('role', 'user')
             if role in ('user', 'assistant'):
@@ -225,5 +226,6 @@ def health():
     return jsonify({
         'status': 'healthy',
         'groqConfigured': svc is not None,
-        'model': svc.model if svc else None
+        'model': svc.model if svc else None,
+        'rag': rag_service.status()
     }), 200

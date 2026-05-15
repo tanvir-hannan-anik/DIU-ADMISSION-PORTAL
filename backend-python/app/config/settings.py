@@ -17,6 +17,23 @@ class Config:
     GROQ_MODEL_2 = os.getenv('GROQ_MODEL_2', 'llama-3.3-70b-versatile')
     GROQ_API_KEY_3 = os.getenv('GROQ_API_KEY_3')
     GROQ_MODEL_3 = os.getenv('GROQ_MODEL_3', 'llama-3.3-70b-versatile')
+
+    # ── RAG: Google Gemini embeddings (Render-safe, pure HTTP) ──────────────
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+    GEMINI_EMBED_MODEL = os.getenv('GEMINI_EMBED_MODEL', 'gemini-embedding-001')
+    EMBED_DIM = int(os.getenv('EMBED_DIM', '768'))
+
+    # ── RAG: Qdrant Cloud vector store (REST API) ──────────────────────────
+    QDRANT_URL = os.getenv('QDRANT_URL')               # e.g. https://xxx.cloud.qdrant.io
+    QDRANT_API_KEY = os.getenv('QDRANT_API_KEY')
+    QDRANT_COLLECTION = os.getenv('QDRANT_COLLECTION', 'diu_kb')
+
+    # RAG behaviour. Falls back to the legacy static prompt when disabled or
+    # when Qdrant/Gemini are unreachable, so production never hard-breaks.
+    RAG_ENABLED = os.getenv('RAG_ENABLED', 'true').lower() in ('1', 'true', 'yes')
+    RAG_TOP_K = int(os.getenv('RAG_TOP_K', '6'))
+    RAG_MIN_SCORE = float(os.getenv('RAG_MIN_SCORE', '0.30'))
+
     FLASK_ENV = os.getenv('FLASK_ENV', 'development')
     SERVICE_HOST = os.getenv('SERVICE_HOST', '0.0.0.0')
     SERVICE_PORT = int(os.getenv('PORT', os.getenv('SERVICE_PORT', '5000')))
@@ -38,3 +55,9 @@ class Config:
         'KB_DATA_PATH',
         os.path.join(_BASE_DIR, 'data', 'departments')
     )), 'departments_dataset.json')
+
+    # PDF sources at the project root, ingested into the RAG index.
+    PDF_SOURCES = [
+        os.path.join(_PROJECT_ROOT, 'waiver-policy2025.pdf'),
+        os.path.join(_PROJECT_ROOT, 'application_instruction.pdf'),
+    ]

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { formatBSTDate } from '../../utils/dateUtils';
 
 function getAdminConfig() {
   try {
@@ -18,6 +19,7 @@ export const AccountsPanel = () => {
   const [lateFeeOverrides, setLateFeeOverrides] = useState({});
   const [showAddFee, setShowAddFee] = useState(null); // request id
   const [newFee, setNewFee] = useState('');
+  const [mobileSidebar, setMobileSidebar] = useState(false);
   const config = getAdminConfig();
 
   useEffect(() => { loadData(); }, []);
@@ -137,8 +139,13 @@ export const AccountsPanel = () => {
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: '#f7f9fb', fontFamily: 'Inter, sans-serif' }}>
 
+      {/* Mobile overlay */}
+      {mobileSidebar && (
+        <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setMobileSidebar(false)} />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-60 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
+      <aside className={`fixed lg:static inset-y-0 left-0 w-60 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col z-50 transition-transform duration-200 ${mobileSidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="h-16 flex items-center px-5 gap-3 border-b border-gray-100">
           <span className="material-symbols-outlined text-2xl text-green-600">account_balance</span>
           <div>
@@ -148,7 +155,7 @@ export const AccountsPanel = () => {
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
+            <button key={t.id} onClick={() => { setTab(t.id); setMobileSidebar(false); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all
                 ${tab === t.id ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
               <span className="material-symbols-outlined text-base">{t.icon}</span>
@@ -177,16 +184,20 @@ export const AccountsPanel = () => {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6">
-          <h1 className="font-extrabold text-gray-800 text-lg">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center px-4 lg:px-6">
+          <button className="lg:hidden mr-3 p-1.5 rounded-lg hover:bg-gray-100" onClick={() => setMobileSidebar(true)}>
+            <span className="material-symbols-outlined text-gray-600">menu</span>
+          </button>
+          <h1 className="font-extrabold text-gray-800 text-base lg:text-lg truncate">
             {TABS.find(t => t.id === tab)?.label}
           </h1>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2 lg:gap-3">
             <button onClick={loadData} className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
-              <span className="material-symbols-outlined text-base">refresh</span> Refresh
+              <span className="material-symbols-outlined text-base">refresh</span>
+              <span className="hidden sm:inline">Refresh</span>
             </button>
-            <div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-xl">
+            <div className="hidden sm:flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-xl">
               <span className="material-symbols-outlined text-green-600 text-base">account_balance</span>
               <span className="text-sm font-bold text-gray-700">Accounts Office</span>
             </div>
@@ -199,7 +210,7 @@ export const AccountsPanel = () => {
           {tab === 'pending' && (
             <div className="space-y-4">
               {/* Summary */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
                   { label: 'Awaiting Payment', value: pendingPayment.filter(r => r.status === 'payment_enabled').length, color: 'blue'   },
                   { label: 'In Approval',       value: pendingPayment.filter(r => ['dept_pending','registrar_pending'].includes(r.status)).length, color: 'orange' },
@@ -232,11 +243,11 @@ export const AccountsPanel = () => {
                           </div>
                           <div className="text-right">
                             {statusBadge(r.status)}
-                            <p className="text-xs text-gray-400 mt-1">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''}</p>
+                            <p className="text-xs text-gray-400 mt-1">{r.createdAt ? formatBSTDate(r.createdAt) : ''}</p>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-4 gap-3 mb-4 text-sm">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-sm">
                           <div className="bg-gray-50 rounded-lg p-3">
                             <p className="text-xs text-gray-500">Semester</p>
                             <p className="font-semibold text-gray-700">{r.semester}</p>
@@ -286,7 +297,7 @@ export const AccountsPanel = () => {
           {tab === 'history' && (
             <div className="space-y-4">
               {/* Summary bar */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
                   { label: 'Total Payments',   value: payments.length,                                                         color: 'blue'   },
                   { label: 'Total Revenue',     value: `৳${payments.reduce((s, p) => s + (p.total || 0), 0).toLocaleString()}`, color: 'green'  },
@@ -306,11 +317,12 @@ export const AccountsPanel = () => {
                 </div>
               ) : (
                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
                         {['Payment ID', 'Student', 'Semester', 'Tuition', 'Late Fee', 'Retake', 'Total', 'Date', 'Status'].map(h => (
-                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -330,7 +342,7 @@ export const AccountsPanel = () => {
                             <td className="px-4 py-3">৳{(p.retakeFee || 0).toLocaleString()}</td>
                             <td className="px-4 py-3 font-bold text-green-700">৳{p.total?.toLocaleString()}</td>
                             <td className="px-4 py-3 text-gray-400 text-xs">
-                              {p.paidAt ? new Date(p.paidAt).toLocaleDateString() : '-'}
+                              {p.paidAt ? formatBSTDate(p.paidAt) : '-'}
                             </td>
                             <td className="px-4 py-3">
                               <span className={`px-2 py-0.5 rounded-full text-xs font-bold
@@ -343,6 +355,7 @@ export const AccountsPanel = () => {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
             </div>
@@ -358,11 +371,12 @@ export const AccountsPanel = () => {
                 </div>
               ) : (
                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
                         {['#', 'Request ID', 'Student', 'Semester', 'Credits', 'Total Fee', 'Status', 'Date'].map(h => (
-                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
+                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -380,12 +394,13 @@ export const AccountsPanel = () => {
                           <td className="px-4 py-3 font-bold">৳{r.fees?.total?.toLocaleString()}</td>
                           <td className="px-4 py-3">{statusBadge(r.status)}</td>
                           <td className="px-4 py-3 text-gray-400 text-xs">
-                            {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '-'}
+                            {r.createdAt ? formatBSTDate(r.createdAt) : '-'}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
             </div>

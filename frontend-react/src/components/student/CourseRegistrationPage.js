@@ -38,6 +38,7 @@ const RAW_SEMESTER_DATA = {
     { course_code:'CIS132',  subject:'Algorithms',                                  faculty:'Mr. Md. Mehedi Hassan'               },
     { course_code:'CIS132L', subject:'Algorithms Lab',                              faculty:'Mr. Md. Mehedi Hassan'               },
     { course_code:'CIS123',  subject:'Discrete Mathematics',                        faculty:'Mr. Md. Biplob Hossain'              },
+    { course_code:'MAT201',  subject:'Mathematics-II',                              faculty:'Mathematics Department'              },
   ],
   'Semester 4': [
     { course_code:'CIS232',  subject:'Object Oriented Programming',                 faculty:'Mr. Md. Nasimul Kader'               },
@@ -74,6 +75,29 @@ const RAW_SEMESTER_DATA = {
     { course_code:'CIS435',  subject:'Cloud Computing',                             faculty:'Mr. Md. Biplob Hossain'              },
     { course_code:'CIS435L', subject:'Cloud Computing Lab',                         faculty:'Mr. Md. Biplob Hossain'              },
   ],
+  'Semester 9': [
+    { course_code:'CIS331',  subject:'Cybersecurity and Network Security',          faculty:'Mr. Md. Biplob Hossain'              },
+    { course_code:'CIS332',  subject:'Human-Computer Interaction',                  faculty:'Ms. Sonia Nasrin'                    },
+    { course_code:'CIS333',  subject:'Mobile Application Development',              faculty:'Mr. Israfil'                         },
+    { course_code:'CIS333L', subject:'Mobile Application Development Lab',          faculty:'Mr. Israfil'                         },
+  ],
+  'Semester 10': [
+    { course_code:'CIS421',  subject:'Big Data and Analytics',                      faculty:'Mr. Md. Mehedi Hassan'               },
+    { course_code:'CIS421L', subject:'Big Data and Analytics Lab',                  faculty:'Mr. Md. Mehedi Hassan'               },
+    { course_code:'CIS422',  subject:'Software Project Management',                 faculty:'Mr. Md. Sarwar Hossain Mollah'       },
+    { course_code:'CIS423',  subject:'E-Commerce and Digital Business',             faculty:'Finance Department'                  },
+  ],
+  'Semester 11': [
+    { course_code:'CIS424',  subject:'Advanced AI and Deep Learning',               faculty:'Mr. Md. Faruk Hosen'                 },
+    { course_code:'CIS424L', subject:'Advanced AI and Deep Learning Lab',           faculty:'Mr. Md. Faruk Hosen'                 },
+    { course_code:'CIS425',  subject:'Blockchain and Distributed Systems',          faculty:'Mr. Md. Biplob Hossain'              },
+    { course_code:'CIS426',  subject:'Research Methodology in Computing',           faculty:'Dr. Mohammed Nadir Bin Ali'          },
+  ],
+  'Semester 12': [
+    { course_code:'CIS497',  subject:'Technical Seminar and Presentation',          faculty:'Mr. Md. Sarwar Hossain Mollah'       },
+    { course_code:'CIS498',  subject:'Industrial Internship',                       faculty:'Mr. Md. Sarwar Hossain Mollah'       },
+    { course_code:'CIS499',  subject:'Thesis / Capstone Project',                   faculty:'Mr. Md. Sarwar Hossain Mollah'       },
+  ],
 };
 
 // Attach credits automatically (lab = 1.5, theory = 3)
@@ -95,6 +119,7 @@ const PREREQUISITES = {
   'ENG102':  ['ENG101'],           // English II ← English I
 
   // Semester 3
+  'MAT201':  ['MAT101'],           // Mathematics-II ← Mathematics-I
   'CIS132':  ['CIS122'],           // Algorithms ← Data Structure
   'CIS132L': ['CIS122L'],          // Algorithms Lab ← DS Lab
   'CIS133':  ['CIS115'],           // Website Development ← Structured Programming
@@ -128,15 +153,40 @@ const PREREQUISITES = {
   'BI334':   ['CIS222'],           // Data Analysis ← DBMS
 
   // Semester 8
-  'CIS414':  ['CIS323'],           // IS Management ← IS Architecture
-  'IoT429':  ['IoT336','CIS313'],  // ML for IoT ← IoT + AI
-  'CIS435':  ['CIS241','CIS211'],  // Cloud Computing ← OS + Computer Networks
-  'CIS435L': ['CIS241L','CIS211L'],// Cloud Computing Lab
+  'CIS414':  ['CIS323'],                // IS Management ← IS Architecture
+  'IoT429':  ['IoT336','CIS313'],       // ML for IoT ← IoT + AI
+  'CIS435':  ['CIS241','CIS211'],       // Cloud Computing ← OS + Networks
+  'CIS435L': ['CIS241L','CIS211L'],     // Cloud Computing Lab
+
+  // Semester 9
+  'CIS331':  ['CIS241','CIS211'],       // Cybersecurity ← OS + Networks
+  'CIS332':  ['CIS133'],               // HCI ← Website Development
+  'CIS333':  ['CIS232'],               // Mobile Dev ← OOP
+  'CIS333L': ['CIS232L'],              // Mobile Dev Lab ← OOP Lab
+
+  // Semester 10
+  'CIS421':  ['BI334','CIS222'],        // Big Data ← Data Analysis + DBMS
+  'CIS421L': ['CIS222L'],              // Big Data Lab ← DBMS Lab
+  'CIS422':  ['CIS323'],               // Proj Mgmt ← IS Architecture
+  'CIS423':  ['FIN232'],               // E-Commerce ← Financial Mgmt
+
+  // Semester 11
+  'CIS424':  ['IoT429','CIS313'],       // Advanced AI ← ML + AI
+  'CIS424L': ['CIS313L'],              // Advanced AI Lab ← AI Lab
+  'CIS425':  ['CIS435','CIS211'],       // Blockchain ← Cloud + Networks
+  'CIS426':  ['CIS422'],               // Research Methodology ← Proj Mgmt
+
+  // Semester 12
+  'CIS497':  ['CIS426'],               // Seminar ← Research Methodology
+  'CIS498':  ['CIS422'],               // Internship ← Proj Mgmt
+  'CIS499':  ['CIS426'],               // Thesis ← Research Methodology
 };
 
 const SEMESTER_ORDER = [
-  'Semester 1','Semester 2','Semester 3','Semester 4',
-  'Semester 5','Semester 6','Semester 7','Semester 8',
+  'Semester 1', 'Semester 2', 'Semester 3',
+  'Semester 4', 'Semester 5', 'Semester 6',
+  'Semester 7', 'Semester 8', 'Semester 9',
+  'Semester 10','Semester 11','Semester 12',
 ];
 
 // Returns set of course codes "completed" — all courses in semesters BEFORE selSem

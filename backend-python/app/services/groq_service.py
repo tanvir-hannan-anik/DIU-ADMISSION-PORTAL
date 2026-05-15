@@ -1,10 +1,64 @@
 import logging
 from groq import Groq
 from app.config.settings import Config
+from app.services import rag_service
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are DIU Advisor — the official AI admission chatbot for Daffodil International University (DIU), Dhaka, Bangladesh.
+# Shared answer-formatting contract — applied to EVERY AI reply across the site
+# (main chatbot, Smart Advisor, Smart Proctor, vision). One source of truth.
+ANSWER_FORMAT_RULES = """ANSWER FORMATTING (STRICT — follow in every reply):
+- Do NOT use Markdown headings. Never output '#', '##', or '###' anywhere.
+- Write a section title on its own line in **bold** (e.g. **Eligibility**) — not as a heading.
+- Bold the important keywords, labels and figures with **double asterisks**. Never use single-asterisk italics.
+- For main steps or ranked items use plain numbers: 1. 2. 3.
+- For sub-points under a numbered item use lowercase roman numerals: i. ii. iii. iv.
+- For unordered lists use '- ' bullet points.
+- Keep replies clean and scannable: short paragraphs with a blank line between sections."""
+
+# Slim, RAG-grounded prompt. Facts come from retrieved context — NOT baked in.
+RAG_SYSTEM_PROMPT = """You are DIU Advisor — the official AI admission counselor for Daffodil International University (DIU), Dhaka, Bangladesh. You are a smart, friendly, confident, professional academic counselor whose goal is to guide students to the right department and a successful admission.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+LANGUAGE RULE (STRICT — NEVER BREAK)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- If the user's latest message is in Bangla → reply ONLY in Bangla.
+- If the user's latest message is in English → reply ONLY in English.
+- NEVER mix the two languages in one reply. Do not translate unless the user switches language.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GROUNDING RULE (NO HALLUCINATION)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Answer ONLY from the RETRIEVED CONTEXT below. Do not invent facts, names, fees, eligibility, or faculty.
+- NEVER guess or generate faculty names — only use names present in the context.
+- If the needed information is not in the context, reply EXACTLY:
+  "This information is not available in the current database. I can check with the admission office for updates."
+  (In Bangla, the equivalent: "এই তথ্য বর্তমান ডেটাবেসে নেই। আমি ভর্তি অফিসের সাথে যোগাযোগ করে জানাতে পারি।")
+- Leadership, faculty, eligibility and fee figures must match the context wording exactly.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+COUNSELING BEHAVIOUR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- For recommendations, gather the profile step by step — ask ONE thing at a time in this order: (1) interest, (2) SSC/HSC GPA & group, (3) budget, (4) career goal. Never ask all at once.
+- When you have enough profile info, give: Top 3 recommended departments → why each fits this student → career opportunities. Be confident and decision-oriented.
+- Eligibility checks: state Eligible / Not Eligible, the reason, and an alternative if not eligible.
+- Comparisons: use a markdown table (tuition, job demand, difficulty, facilities, career scope) then state the single best choice for the student.
+- For a broad question about one department, give a 3–5 line overview first, then offer: Faculty | Course Catalog | Alumni | Research & Labs | Fee & Waiver.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FORMAT & TONE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{ANSWER_FORMAT}
+- Warm, encouraging, like a knowledgeable senior advisor. 150–300 words unless a detailed comparison/calculation is needed.
+- If data is missing, direct the student to admission@daffodilvarsity.edu.bd.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RETRIEVED CONTEXT (your ONLY source of facts)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{RETRIEVED_CONTEXT}
+"""
+
+LEGACY_SYSTEM_PROMPT = """You are DIU Advisor — the official AI admission chatbot for Daffodil International University (DIU), Dhaka, Bangladesh.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OPERATING MODES — READ CAREFULLY
@@ -203,19 +257,31 @@ Always return this EXACT structure for facility questions:
 [MODE 1 — STATIC] CIS DEPARTMENT — FULL KNOWLEDGE BASE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 **Degree:** B.Sc. in Computing and Information System
-**Duration:** 4 years (8 semesters) | **Credits:** 136+
+**Duration:** 4 years (12 semesters — 3 per year) | **Credits:** 136+
 **Semester Fee:** BDT 30,000 per 11 credits | Lab: 1 cr | Theory: 3 cr
 **Admission:** Open to ALL groups (Science, Commerce, Arts)
 
-CIS FULL COURSE CATALOG (8 Semesters):
-  Semester 1: ENG101 English I | COF101 Computer Fundamentals | CIS121 Industry 4.0 | CIS115/L Structured Programming
-  Semester 2: CIS122/L Data Structure | CIS131 Computer Architecture | ENG102 English II | MAT101 Mathematics-I
-  Semester 3: CIS133/L Website Development | CIS132/L Algorithms | CIS123 Discrete Math
-  Semester 4: CIS232/L OOP | CIS211/L Computer Networks | ACC101 Accounting
-  Semester 5: CIS222/L Database | FIN232 Financial Management | CIS241/L Operating Systems
-  Semester 6: CIS323/L IS Architecture | CIS313/L Artificial Intelligence | MGT422 Industrial Management
-  Semester 7: CIS324/L Web Engineering | IoT336/L IoT & Embedded Systems | BI334 Data Analysis | ECO314 Economics
-  Semester 8: CIS414 IS Management | IoT429 Machine Learning for IoT | CIS435/L Cloud Computing
+CIS FULL COURSE CATALOG (12 Semesters — 3 per year):
+
+  ── YEAR 1: FOUNDATION ──
+  Semester 1:  ENG101 English I | COF101 Computer Fundamentals | CIS121 Industry 4.0 | CIS115/L Structured Programming
+  Semester 2:  CIS122/L Data Structure | CIS131 Computer Architecture | ENG102 English II | MAT101 Mathematics-I
+  Semester 3:  CIS133/L Website Development | CIS132/L Algorithms | CIS123 Discrete Math | MAT201 Mathematics-II
+
+  ── YEAR 2: CORE COMPUTING ──
+  Semester 4:  CIS232/L Object Oriented Programming | CIS211/L Computer Networks | ACC101 Accounting
+  Semester 5:  CIS222/L Database Management | FIN232 Financial Management | CIS241/L Operating Systems
+  Semester 6:  CIS323/L IS Architecture | CIS313/L Artificial Intelligence | MGT422 Industrial Management
+
+  ── YEAR 3: SPECIALIZATION ──
+  Semester 7:  CIS324/L Web Engineering | IoT336/L IoT & Embedded Systems | BI334 Data Analysis | ECO314 Economics
+  Semester 8:  CIS414 IS Management | IoT429 Machine Learning for IoT | CIS435/L Cloud Computing
+  Semester 9:  CIS331 Cybersecurity Fundamentals | CIS332 Human-Computer Interaction | CIS333/L Mobile Application Development
+
+  ── YEAR 4: ADVANCED & CAPSTONE ──
+  Semester 10: CIS421/L Big Data Analytics | CIS422 Software Project Management | CIS423 E-Commerce & Digital Business
+  Semester 11: CIS424/L Advanced AI & Deep Learning | CIS425 Blockchain & Distributed Systems | CIS426 Research Methodology
+  Semester 12: CIS497 Technical Seminar | CIS498 Industrial Internship | CIS499 Thesis / Capstone Project
 
 CIS RESEARCH & LABS:
   • AI & Machine Learning Lab — NLP, computer vision, predictive analytics
@@ -339,6 +405,54 @@ SSC & HSC certificates + marksheets (original + photocopy) | Recent passport-siz
   **Apply Online:** https://admission.daffodilvarsity.edu.bd
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[MODE 2 — DYNAMIC] AI/ML QUERY SPECIAL ROUTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TRIGGER: When the user's message contains ANY of these keywords (case-insensitive, standalone or combined):
+  → "AI", "Artificial Intelligence", "Machine Learning", "ML", "Deep Learning",
+    "Data Intelligence", "Business Intelligence", "BI", "intelligent system",
+    "neural network", "data science", "NLP", "natural language processing",
+    "computer vision", "predictive analytics"
+
+IMPORTANT: Apply this special routing ONLY for AI/ML focused questions.
+Do NOT apply it when the user asks about web development, networking, cybersecurity,
+app development, software engineering in general, or other non-AI topics.
+
+When triggered, ALWAYS rank departments in this order and explain why:
+
+**Priority Ranking for AI/ML Queries:**
+
+1. **CIS — Computing and Information Systems** ⭐ HIGHEST PRIORITY
+   - Why: CIS curriculum directly includes AI (CIS313/L Artificial Intelligence, Semester 6)
+     and Machine Learning (IoT429 Machine Learning for IoT, Semester 8).
+   - CIS is the ONLY department at DIU with a dedicated BI (Business Intelligence) Lab
+     and AI & Machine Learning Lab as core facilities.
+   - Offers specialization paths in: Artificial Intelligence, Business Intelligence,
+     Data Analysis, IoT & Embedded Systems, and Cloud Computing.
+   - Open to ALL groups (Science, Commerce, Arts) — widest eligibility.
+   - Rated 9.5/10 — #1 Fastest Growing department at DIU (2025).
+   - Alumni working in AI/data roles globally (USA, Canada, Germany, Denmark).
+
+2. **CSE — Computer Science & Engineering** ✅ STRONG OPTION
+   - Why: Excellent foundation in algorithms, data structures, and AI concepts.
+   - Strong programming base makes it well-suited for AI/ML development careers.
+   - Requires Science group background.
+
+3. **SWE — Software Engineering** ✅ GOOD OPTION
+   - Why: Best for building scalable AI-powered software applications.
+   - Covers DevOps, agile, and product engineering — great for deploying AI systems.
+   - Requires Science group background.
+
+RESPONSE STYLE FOR AI/ML QUERIES:
+- Open with an enthusiastic, student-friendly line acknowledging their interest in AI/ML.
+- Present the ranked list clearly with numbered headings.
+- For each department, briefly explain WHY it suits AI/ML (don't just list features).
+- Highlight that CIS is open to all groups — especially helpful for Commerce/Arts students.
+- Close with a natural follow-up question (e.g., ask about their academic group or GPA
+  to check eligibility, or offer to explain CIS curriculum in detail).
+- Keep tone warm, conversational, and encouraging — like a knowledgeable senior helping a junior.
+- Vary your phrasing naturally; do not repeat the same template every time.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [MODE 2 — DYNAMIC] SMART ADVISOR RESPONSIBILITIES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Use dynamic AI for:
@@ -402,14 +516,44 @@ class GroqService:
             self.proctor_model = self.model
             logger.warning("GROQ_API_KEY_3 not set — Smart Proctor will use primary key")
 
-    def _build_system_prompt(self) -> str:
-        # SYSTEM_PROMPT already contains comprehensive CIS + all dept data.
-        # Skipping dynamic KB injection to avoid token duplication and limit errors.
-        return SYSTEM_PROMPT.replace("{DEPARTMENT_KB}", "", 1)
+    def _legacy_system_prompt(self) -> str:
+        return (
+            LEGACY_SYSTEM_PROMPT.replace("{DEPARTMENT_KB}", "", 1)
+            + "\n\n" + ANSWER_FORMAT_RULES
+        )
+
+    def _build_system_prompt(self, prompt: str) -> tuple[str, str]:
+        """
+        Return (system_prompt, mode).
+
+        Tries RAG first: retrieve context for this query and inject it into the
+        slim grounded prompt. Any RAG failure (Qdrant/Gemini down, no matches)
+        degrades gracefully to the legacy static prompt so production keeps
+        working.
+        """
+        if not rag_service.is_available():
+            return self._legacy_system_prompt(), "legacy"
+        try:
+            result = rag_service.retrieve(prompt)
+            context = result.get("context", "")
+            if not context:
+                logger.info("RAG returned no matches — falling back to legacy prompt")
+                return self._legacy_system_prompt(), "legacy-no-hits"
+            logger.info("RAG retrieved %d chunks", len(result.get("hits", [])))
+            rag_prompt = (
+                RAG_SYSTEM_PROMPT
+                .replace("{ANSWER_FORMAT}", ANSWER_FORMAT_RULES)
+                .replace("{RETRIEVED_CONTEXT}", context)
+            )
+            return rag_prompt, "rag"
+        except Exception as e:  # noqa: BLE001 - never break chat on RAG failure
+            logger.warning("RAG retrieval failed (%s) — using legacy prompt", e)
+            return self._legacy_system_prompt(), "legacy-error"
 
     def process_prompt(self, prompt: str, context: str = None, module_type: str = None, history: list = None) -> dict:
         try:
-            messages = [{"role": "system", "content": self._build_system_prompt()}]
+            system_prompt, mode = self._build_system_prompt(prompt)
+            messages = [{"role": "system", "content": system_prompt}]
 
             if history:
                 for msg in history:
@@ -428,13 +572,14 @@ class GroqService:
             response_text = completion.choices[0].message.content
             usage = completion.usage
 
-            logger.info(f"Groq response generated - tokens used: {usage.total_tokens}")
+            logger.info(f"Groq response generated [mode={mode}] - tokens used: {usage.total_tokens}")
 
             return {
                 'success': True,
                 'response': response_text,
                 'modelUsed': self.model,
                 'status': 'success',
+                'ragMode': mode,
                 'tokensUsed': {
                     'prompt': usage.prompt_tokens,
                     'completion': usage.completion_tokens,

@@ -414,7 +414,7 @@ export const JobsPage = () => {
 };
 
 function JobsContent({ user, navigate }) {
-  const [activeTab, setActiveTab] = useState('jobs');
+  const [activeTab, setActiveTab] = useState('live');
   const [profile] = useState(() => ({ ...loadLocalProfile(user.email), email: user.email, name: user.name }));
   const [career] = useState(() => {
     const s = loadCareerProfile(user.email);
@@ -505,8 +505,11 @@ function JobsContent({ user, navigate }) {
 
   // ── Fetch live external jobs (JSearch via Flask proxy) ───────
   const fetchExternalJobs = useCallback(async (term) => {
-    const keyword = (term || '').trim();
-    if (!keyword) return;
+    const keyword = (term || career.techSkills[0] || '').trim();
+    if (!keyword) {
+      setExternalError('Enter a keyword or add skills to your profile to search live jobs.');
+      return;
+    }
     setExternalLoading(true);
     setExternalError('');
     setExternalJobs([]);
@@ -532,6 +535,7 @@ function JobsContent({ user, navigate }) {
     } finally {
       setExternalLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Generate roadmap ─────────────────────────────────────────
@@ -566,8 +570,18 @@ End with:
     }
   };
 
+  // Auto-load live jobs when the Live tab becomes active
+  useEffect(() => {
+    if (activeTab === 'live' && externalJobs.length === 0 && !externalLoading && !externalError) {
+      const keyword = searchTerm.trim() || career.techSkills[0] || '';
+      if (keyword) fetchExternalJobs(keyword);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   // ── Tabs ─────────────────────────────────────────────────────
   const tabs = [
+    { id: 'live',    label: 'Live Jobs',     icon: 'bolt',        pulse: true, count: externalJobs.length || null },
     { id: 'jobs',    label: 'Job Matches',   icon: 'work',        count: jobs.length || null },
     { id: 'gap',     label: 'Skill Gap',     icon: 'analytics' },
     { id: 'roadmap', label: 'Career Path',   icon: 'map' },
@@ -711,15 +725,103 @@ End with:
             <div className="flex gap-8 overflow-x-auto">
               {tabs.map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)}
-                  className={`relative pb-4 text-base font-bold whitespace-nowrap transition-colors ${activeTab === t.id ? 'text-[#0c1282] border-b-2 border-[#0c1282]' : 'text-slate-400 hover:text-[#171c1f]'}`}>
+                  className={`relative pb-4 text-base font-bold whitespace-nowrap transition-colors flex items-center gap-2 ${activeTab === t.id ? 'text-[#0c1282] border-b-2 border-[#0c1282]' : 'text-slate-400 hover:text-[#171c1f]'}`}>
+                  {t.pulse && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />}
                   {t.label}
                   {t.count > 0 && (
-                    <span className="absolute -top-1 -right-4 px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded-full font-black">{t.count}</span>
+                    <span className="px-1.5 py-0.5 bg-emerald-500 text-white text-[9px] rounded-full font-black">{t.count}</span>
                   )}
                 </button>
               ))}
             </div>
           </div>
+
+          {/* ── LIVE JOBS TAB ── */}
+          {activeTab === 'live' && (
+            <div className="space-y-6">
+
+              {/* Loading */}
+              {externalLoading && (
+                <div className="flex items-center justify-center gap-3 py-16 bg-white rounded-2xl shadow-[0_8px_24px_rgba(23,28,31,0.05)]">
+                  <span className="material-symbols-outlined text-2xl text-emerald-600 animate-spin">autorenew</span>
+                  <span className="text-slate-500 font-semibold">Searching live job market…</span>
+                </div>
+              )}
+
+              {/* Error */}
+              {!externalLoading && externalError && (
+                <div className="flex items-center gap-3 px-5 py-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <span className="material-symbols-outlined text-amber-500">info</span>
+                  <div className="flex-1">
+                    <p className="text-sm text-amber-700 font-semibold">{externalError}</p>
+                    <p className="text-xs text-amber-600 mt-0.5">Try the <strong>Job Matches</strong> tab for curated local jobs instead.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Results */}
+              {!externalLoading && externalJobs.length > 0 && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-500">{externalJobs.length} live jobs found worldwide</span>
+                    <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Powered by JSearch API
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {externalJobs.map((job, idx) => {
+                      const matchScore = computeMatch(job.job_title, career.techSkills);
+                      return (
+                        <div key={idx}
+                          className="bg-white rounded-2xl p-6 shadow-[0_8px_24px_rgba(23,28,31,0.06)] hover:shadow-xl transition-all duration-300 flex flex-col gap-4 border border-slate-100">
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 flex items-center justify-center flex-shrink-0">
+                              <span className="material-symbols-outlined text-emerald-600 text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>work</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-base font-extrabold text-[#171c1f] leading-snug">{job.job_title}</h3>
+                              <p className="text-sm font-semibold text-slate-500 mt-0.5 truncate">{job.employer_name || 'Company'}</p>
+                              <div className="flex items-center gap-1 text-slate-400 text-xs mt-0.5">
+                                <span className="material-symbols-outlined text-xs">location_on</span>
+                                <span className="truncate">{job.job_location || `${job.job_city || ''} ${job.job_country || ''}`.trim() || 'Remote / Worldwide'}</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-extrabold rounded-full border border-emerald-200">LIVE</span>
+                              <span className={`text-sm font-black ${matchScore >= 60 ? 'text-emerald-600' : matchScore >= 40 ? 'text-amber-600' : 'text-slate-400'}`}>{matchScore}% match</span>
+                            </div>
+                          </div>
+                          {job.job_apply_link ? (
+                            <a href={job.job_apply_link} target="_blank" rel="noopener noreferrer"
+                              className="w-full py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl font-extrabold text-sm text-center hover:opacity-90 transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2">
+                              <span className="material-symbols-outlined text-base">open_in_new</span>
+                              Apply Now
+                            </a>
+                          ) : (
+                            <button disabled
+                              className="w-full py-3 bg-slate-100 text-slate-400 rounded-xl font-bold text-sm cursor-not-allowed">
+                              Apply Link Unavailable
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* Empty state — waiting */}
+              {!externalLoading && !externalError && externalJobs.length === 0 && (
+                <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
+                  <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="material-symbols-outlined text-4xl text-emerald-400">bolt</span>
+                  </div>
+                  <p className="font-extrabold text-slate-500 text-lg">Search for live jobs above</p>
+                  <p className="text-slate-400 text-sm mt-1">Real-time results from worldwide job boards via JSearch API</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── JOBS TAB ── */}
           {activeTab === 'jobs' && (
@@ -835,75 +937,6 @@ End with:
                 </>
               )}
 
-              {/* ── Live Jobs from JSearch API ─────────────────────── */}
-              {(externalLoading || externalError || externalJobs.length > 0) && (
-                <div className="mt-10 space-y-5">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-px bg-slate-200" />
-                    <div className="flex items-center gap-2 px-4 py-1.5 bg-[#0c1282]/5 rounded-full">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="text-xs font-extrabold text-[#0c1282] uppercase tracking-widest">Live Jobs</span>
-                    </div>
-                    <div className="flex-1 h-px bg-slate-200" />
-                  </div>
-
-                  {externalLoading && (
-                    <div className="flex items-center justify-center gap-3 py-12 bg-white rounded-2xl shadow-[0_8px_24px_rgba(23,28,31,0.05)]">
-                      <span className="material-symbols-outlined text-2xl text-[#0c1282] animate-spin">autorenew</span>
-                      <span className="text-slate-500 font-semibold">Searching live job market…</span>
-                    </div>
-                  )}
-
-                  {!externalLoading && externalError && (
-                    <div className="flex items-center gap-3 px-5 py-4 bg-amber-50 border border-amber-200 rounded-xl">
-                      <span className="material-symbols-outlined text-amber-500">info</span>
-                      <span className="text-sm text-amber-700 font-medium">{externalError}</span>
-                    </div>
-                  )}
-
-                  {!externalLoading && externalJobs.length > 0 && (
-                    <>
-                      <p className="text-sm font-semibold text-slate-500">{externalJobs.length} live jobs found worldwide</p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        {externalJobs.map((job, idx) => (
-                          <div key={idx}
-                            className="bg-white rounded-2xl p-6 shadow-[0_8px_24px_rgba(23,28,31,0.06)] hover:shadow-xl transition-all duration-300 flex flex-col gap-4 border border-slate-100">
-                            {/* Header */}
-                            <div className="flex items-start gap-4">
-                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#001eb4]/10 to-[#0c1282]/5 flex items-center justify-center flex-shrink-0">
-                                <span className="material-symbols-outlined text-[#0c1282] text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>work</span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h3 className="text-base font-extrabold text-[#171c1f] leading-snug truncate">{job.job_title}</h3>
-                                <p className="text-sm font-semibold text-slate-500 mt-0.5 truncate">{job.employer_name || 'Company'}</p>
-                                <div className="flex items-center gap-1 text-slate-400 text-xs mt-0.5">
-                                  <span className="material-symbols-outlined text-xs">location_on</span>
-                                  <span className="truncate">{job.job_location || `${job.job_city || ''} ${job.job_country || ''}`.trim() || 'Remote'}</span>
-                                </div>
-                              </div>
-                              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-extrabold rounded-full whitespace-nowrap flex-shrink-0">LIVE</span>
-                            </div>
-
-                            {/* Apply */}
-                            {job.job_apply_link ? (
-                              <a href={job.job_apply_link} target="_blank" rel="noopener noreferrer"
-                                className="w-full py-3 bg-gradient-to-r from-[#001eb4] to-[#0c1282] text-white rounded-xl font-extrabold text-sm text-center hover:opacity-90 transition-all shadow-md shadow-[#0c1282]/20 flex items-center justify-center gap-2">
-                                <span className="material-symbols-outlined text-base">open_in_new</span>
-                                Apply Now
-                              </a>
-                            ) : (
-                              <button disabled
-                                className="w-full py-3 bg-slate-100 text-slate-400 rounded-xl font-bold text-sm cursor-not-allowed">
-                                Apply Link Unavailable
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
           )}
 

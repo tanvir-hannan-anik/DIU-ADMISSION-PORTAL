@@ -42,6 +42,20 @@ export const useAuth = () => {
     }
   }, []);
 
+  const loginWithGoogle = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await authService.loginWithGoogle();
+      if (result.success) {
+        setUser(result.data.user);
+        setIsAuthenticated(true);
+      }
+      return result;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const logout = useCallback(() => {
     authService.logout();
     setUser(null);
@@ -54,6 +68,7 @@ export const useAuth = () => {
     loading,
     login,
     register,
+    loginWithGoogle,
     logout,
   };
 };

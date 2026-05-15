@@ -749,7 +749,7 @@ export const FacilitiesPage = () => {
 
             {/* Stats row */}
             <section className="-mx-6 md:-mx-8 px-6 md:px-8 py-20 mt-16 bg-surface-container-low">
-              <div className="max-w-screen-2xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
+              <div className="max-w-screen-2xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-8 sm:gap-12 text-center">
                 {[
                   { value: '2400+', label: 'Student Capacity' },
                   { value: '100%',  label: 'Secure Perimeter' },

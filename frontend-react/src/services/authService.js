@@ -3,6 +3,15 @@
 // LocalStorage flow (self-registered): name + email + password stored locally
 
 import api from './api';
+import { signInWithPopup, signOut } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  auth,
+  db,
+  googleProvider,
+  isFirebaseConfigured,
+  ALLOWED_DOMAIN,
+} from '../config/firebase';
 
 const USERS_KEY = 'diu_users';
 const TOKEN_KEY = 'authToken';
@@ -60,10 +69,10 @@ export const authService = {
   },
 
   // ── Self-register: try backend first, fall back to localStorage ──────────────
-  register: async ({ name, email, password }) => {
+  register: async ({ name, email, password, studentId }) => {
     // Try backend
     try {
-      const res = await api.post('/v1/auth/self-register', { name: name.trim(), email: email.trim(), password });
+      const res = await api.post('/v1/auth/self-register', { name: name.trim(), email: email.trim(), password, studentId: (studentId || '').trim() });
       const { token, user } = res.data.data;
       saveSession(token, user);
       return { success: true, data: { user, token } };
@@ -84,6 +93,7 @@ export const authService = {
       id: `local-${Date.now()}`,
       name: name.trim(),
       email: email.trim().toLowerCase(),
+      studentId: (studentId || '').trim(),
       password,
       role: 'student',
       createdAt: new Date().toISOString(),
@@ -158,9 +168,80 @@ export const authService = {
     return { success: true, token, resetLink: `/set-password?token=${token}` };
   },
 
+  // ── Google Workspace sign-in (students, @diu.edu.bd only) ──────────────────
+  // Authenticates with Firebase, rejects any non-diu.edu.bd account, then
+  // upserts the student profile into Firestore (collection: "students").
+  loginWithGoogle: async () => {
+    if (!isFirebaseConfigured) {
+      return { success: false, error: 'Google sign-in is not configured. Contact the administrator.' };
+    }
+
+    let result;
+    try {
+      result = await signInWithPopup(auth, googleProvider);
+    } catch (err) {
+      const code = err?.code || '';
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        return { success: false, error: 'Sign-in cancelled.' };
+      }
+      if (code === 'auth/popup-blocked') {
+        return { success: false, error: 'Popup blocked. Please allow popups for this site and try again.' };
+      }
+      return { success: false, error: 'Google sign-in failed. Please try again.' };
+    }
+
+    const fbUser = result.user;
+    const email = (fbUser.email || '').toLowerCase();
+
+    // Enforce the institutional domain. `hd` on the provider is only a hint —
+    // this check is the actual gate.
+    if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
+      await signOut(auth).catch(() => {});
+      return {
+        success: false,
+        error: `Only @${ALLOWED_DOMAIN} Google Workspace accounts can sign in.`,
+      };
+    }
+
+    const uid = fbUser.uid;
+    const profile = {
+      uid,
+      name: fbUser.displayName || email.split('@')[0],
+      email,
+      photoURL: fbUser.photoURL || '',
+      role: 'student',
+      provider: 'google',
+      emailVerified: fbUser.emailVerified,
+    };
+
+    // Store / refresh the student record in Firestore.
+    try {
+      const ref = doc(db, 'students', uid);
+      const snap = await getDoc(ref);
+      await setDoc(
+        ref,
+        {
+          ...profile,
+          ...(snap.exists() ? {} : { createdAt: serverTimestamp() }),
+          lastLoginAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    } catch (err) {
+      await signOut(auth).catch(() => {});
+      return { success: false, error: 'Could not save your student profile. Please try again.' };
+    }
+
+    const token = await fbUser.getIdToken();
+    const user = { id: uid, ...profile };
+    saveSession(token, user);
+    return { success: true, data: { user, token } };
+  },
+
   logout: () => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    if (isFirebaseConfigured) signOut(auth).catch(() => {});
     return { success: true };
   },
 

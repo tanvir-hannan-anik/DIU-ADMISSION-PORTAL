@@ -14,6 +14,7 @@ from app.services.ingestion_service import (
     ingest_all, get_ingestion_status, load_dataset
 )
 from app.services.knowledge_base_service import refresh_knowledge_base
+from app.services import rag_service
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('ingestion', __name__, url_prefix='/api/v1/ingestion')
@@ -57,5 +58,25 @@ def dataset():
     """Return the full departments dataset."""
     try:
         return jsonify({"success": True, "data": load_dataset()}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@bp.route('/rag/rebuild', methods=['POST'])
+def rag_rebuild():
+    """(Re)build the Qdrant RAG index from seed + dataset + PDFs."""
+    try:
+        result = rag_service.build_index()
+        return jsonify({"success": True, "data": result}), 200
+    except Exception as e:
+        logger.error(f"RAG rebuild failed: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@bp.route('/rag/status', methods=['GET'])
+def rag_status():
+    """Report RAG readiness (Gemini + Qdrant + collection info)."""
+    try:
+        return jsonify({"success": True, "data": rag_service.status()}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

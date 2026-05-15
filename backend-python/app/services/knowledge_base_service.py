@@ -24,6 +24,16 @@ _GENERAL_KEYWORDS = {
     'apply', 'application', 'join', 'enroll', 'intake', 'seat',
 }
 
+# AI/ML keywords that should surface CIS, CSE, SWE (in priority order)
+_AI_ML_KEYWORDS = {
+    'ai', 'artificial', 'intelligence', 'machine', 'learning', 'ml',
+    'deep', 'data', 'neural', 'nlp', 'natural', 'language', 'processing',
+    'computer', 'vision', 'predictive', 'analytics', 'bi',
+}
+
+# Ordered priority departments for AI/ML queries
+_AI_ML_DEPT_PRIORITY = ['CIS', 'CSE', 'SWE']
+
 # Top departments to include for general queries (by short_name)
 _TOP_DEPTS = {'CSE', 'SWE', 'CIS', 'EEE', 'BBA', 'CE', 'MCT', 'Pharmacy'}
 
@@ -122,11 +132,26 @@ def get_kb() -> str:
     return _kb_cache
 
 
+def _is_ai_ml_query(words: set) -> bool:
+    """Return True if the query is focused on AI/ML topics."""
+    # Must contain an AI/ML keyword; exclude purely structural matches like 'computer' alone
+    ai_hits = words & _AI_ML_KEYWORDS
+    if not ai_hits:
+        return False
+    # Avoid false positives: 'computer science' alone shouldn't trigger AI priority
+    # Require at least one strong AI signal beyond generic computing terms
+    strong_signals = ai_hits - {'computer', 'data', 'natural', 'language', 'deep'}
+    broad_signals = {'ai', 'ml', 'artificial', 'intelligence', 'machine', 'learning',
+                     'neural', 'nlp', 'predictive', 'analytics', 'vision', 'bi'}
+    return bool(strong_signals) or bool(ai_hits & broad_signals)
+
+
 def get_kb_for_query(query: str) -> str:
     """
     Return a KB section filtered to departments relevant to the query.
     Falls back to top popular departments for general queries.
     Strips punctuation before matching so "CIS," and "CIS" both match.
+    For AI/ML queries, always returns CIS → CSE → SWE in priority order.
     """
     import re as _re
     global _dept_records
@@ -139,6 +164,13 @@ def get_kb_for_query(query: str) -> str:
     q_clean = _re.sub(r'[^\w\s]', ' ', query.lower())
     words = set(q_clean.split())
 
+    # AI/ML special routing — CIS first, then CSE, then SWE
+    if _is_ai_ml_query(words):
+        dept_map = {d.get('short_name'): d for d in _dept_records}
+        ai_depts = [dept_map[k] for k in _AI_ML_DEPT_PRIORITY if k in dept_map]
+        if ai_depts:
+            return _build_section(ai_depts, "AI/ML recommended departments: CIS → CSE → SWE")
+
     # Check if this is a general query
     is_general = bool(words & _GENERAL_KEYWORDS)
 
@@ -149,7 +181,7 @@ def get_kb_for_query(query: str) -> str:
 
         # Match by short name as a whole word, or by significant name words
         name_words = {w for w in name.split() if len(w) > 3}
-        short_match = short and (short in words)           # exact word match (punctuation stripped)
+        short_match = short and (short in words)
         name_match = bool(name_words & words)
         if short_match or name_match:
             matched.append(dept)
