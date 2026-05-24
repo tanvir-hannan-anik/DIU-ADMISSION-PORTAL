@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigation } from '../common/Navigation';
+import { liveDataService } from '../../services/liveDataService';
 
 /* ─── Waiver logic (from official waiver-policy2025.pdf) ─────── */
 // "Golden GPA-5" = GPA 5.00 with A+ in ALL subjects (including 4th subject)
@@ -117,6 +118,29 @@ export const ScholarshipPage = () => {
 
   const [result, setResult] = useState(null);
   const [error,  setError]  = useState('');
+
+  // Live data from DIU website
+  const [liveData,        setLiveData]        = useState(null);
+  const [liveLoading,     setLiveLoading]     = useState(true);
+  const [liveError,       setLiveError]       = useState('');
+  const [liveRefreshing,  setLiveRefreshing]  = useState(false);
+
+  useEffect(() => {
+    liveDataService.getScholarships().then(res => {
+      setLiveLoading(false);
+      if (res.success && res.data) setLiveData(res.data);
+      else setLiveError(res.error || 'Could not load live data');
+    });
+  }, []);
+
+  const handleLiveRefresh = async () => {
+    setLiveRefreshing(true);
+    setLiveError('');
+    const res = await liveDataService.getScholarships(true);
+    setLiveRefreshing(false);
+    if (res.success && res.data) setLiveData(res.data);
+    else setLiveError(res.error || 'Refresh failed');
+  };
 
   const calculate = () => {
     setResult(null);
@@ -421,6 +445,108 @@ export const ScholarshipPage = () => {
               </div>
             </div>
           </div>
+        </section>
+
+        {/* ── Live Scholarship Data from DIU Website ── */}
+        <section>
+          <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+            <div>
+              <h2 className="text-xl font-bold text-[#0c1282]">Live Scholarship Data from DIU</h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Real-time data fetched from{' '}
+                <a href="https://daffodilvarsity.edu.bd/scholarship/diu-scholarship"
+                  target="_blank" rel="noopener noreferrer"
+                  className="text-[#0c1282] underline underline-offset-2">
+                  daffodilvarsity.edu.bd
+                </a>
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {liveData?.fetched_at && (
+                <span className="text-xs text-gray-400 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">schedule</span>
+                  {liveData.fetched_at}
+                </span>
+              )}
+              <button
+                onClick={handleLiveRefresh}
+                disabled={liveRefreshing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#0c1282] text-white hover:bg-[#0c1282]/85 disabled:opacity-50 transition-colors"
+              >
+                <span className={`material-symbols-outlined text-sm ${liveRefreshing ? 'animate-spin' : ''}`}>refresh</span>
+                {liveRefreshing ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+
+          {liveLoading && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
+              <div className="inline-block w-6 h-6 border-2 border-[#0c1282] border-t-transparent rounded-full animate-spin mb-3" />
+              <p className="text-xs text-gray-400">Fetching live scholarship data…</p>
+            </div>
+          )}
+
+          {!liveLoading && liveError && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-3">
+              <span className="material-symbols-outlined text-amber-500 text-xl mt-0.5">warning</span>
+              <div>
+                <p className="text-sm font-semibold text-amber-700">Could not load live data</p>
+                <p className="text-xs text-amber-600 mt-0.5">{liveError}</p>
+                <p className="text-xs text-gray-400 mt-1">Showing offline scholarship data below instead.</p>
+              </div>
+            </div>
+          )}
+
+          {!liveLoading && liveData?.success && (
+            <>
+              {/* Table entries (when the DIU page uses a table) */}
+              {liveData.scholarships?.length > 0 && (
+                <div className="overflow-hidden rounded-2xl border border-gray-200 shadow-sm mt-4">
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {liveData.scholarships.map((item, i) => {
+                        const keys = Object.keys(item);
+                        if (keys.length === 1 && keys[0] === 'info') {
+                          return (
+                            <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-5 py-3 text-gray-700 text-xs">{item.info}</td>
+                            </tr>
+                          );
+                        }
+                        return (
+                          <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            {keys.map(k => (
+                              <td key={k} className="px-5 py-3 text-gray-700 text-xs">
+                                {k !== keys[0] && <span className="text-gray-400 mr-1">{k}:</span>}
+                                {item[k]}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Raw text fallback when no structured entries */}
+              {(!liveData.scholarships || liveData.scholarships.length === 0) && liveData.raw_text && (
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 mt-4">
+                  <pre className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed font-sans">
+                    {liveData.raw_text.slice(0, 3000)}
+                    {liveData.raw_text.length > 3000 && (
+                      <span className="text-gray-400">…[truncated — visit DIU website for full details]</span>
+                    )}
+                  </pre>
+                </div>
+              )}
+
+              <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">info</span>
+                Data sourced directly from DIU's official scholarship page. Cached for 1 hour.
+              </p>
+            </>
+          )}
         </section>
 
         {/* ── Other Scholarships ── */}

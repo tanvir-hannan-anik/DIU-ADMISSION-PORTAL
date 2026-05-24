@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Navigation } from '../common/Navigation';
 import { useAuth } from '../../hooks/useAuth';
+import { useVoice } from '../../hooks/useVoice';
 import axios from 'axios';
 import API_CONFIG from '../../config/apiConfig';
 import { readFileForChat, getFileIcon, analyzeImageWithVision } from '../../utils/fileReader';
@@ -127,13 +128,39 @@ export function SmartProctorPage() {
   const [showEmergency, setShowEmergency] = useState(true);
   const [attachedFile, setAttachedFile] = useState(null);
   const [fileError, setFileError] = useState('');
-  const bottomRef = useRef(null);
-  const inputRef = useRef(null);
+  const bottomRef    = useRef(null);
+  const inputRef     = useRef(null);
   const fileInputRef = useRef(null);
+  const lastSpokenRef = useRef(-1);
+  const voice = useVoice();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
+
+  // Auto-speak new assistant messages when voice output is on
+  useEffect(() => {
+    if (!voice.voiceOn) return;
+    const idx = messages.length - 1;
+    const last = messages[idx];
+    if (!last || last.role !== 'assistant') return;
+    if (idx === lastSpokenRef.current) return;
+    lastSpokenRef.current = idx;
+    voice.speak(last.content);
+  }, [messages, voice.voiceOn]); // eslint-disable-line
+
+  // Sync interim speech transcript → input field
+  useEffect(() => {
+    if (voice.transcript) setInput(voice.transcript);
+  }, [voice.transcript]); // eslint-disable-line
+
+  const handleMicClick = () => {
+    if (voice.isListening) { voice.stopListening(); return; }
+    // Fill input — user reviews before sending (prevents sending mis-recognized text)
+    voice.startListening((t) => {
+      setInput(t);
+    });
+  };
 
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
@@ -270,6 +297,16 @@ export function SmartProctorPage() {
                 style={{ backgroundColor: '#d5e3fc', color: '#0d1c2e' }}>
                 Online
               </span>
+              {voice.supported && (
+                <button onClick={voice.toggleVoice}
+                  title={voice.voiceOn ? 'Voice output ON — click to turn off' : 'Turn on voice (proctor speaks responses)'}
+                  className="p-2 rounded-full transition-colors hover:bg-gray-100"
+                  style={{ color: voice.voiceOn ? '#0c1282' : '#464652' }}>
+                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    {voice.isSpeaking ? 'volume_up' : voice.voiceOn ? 'volume_down' : 'volume_off'}
+                  </span>
+                </button>
+              )}
               <button className="p-2 rounded-full transition-colors hover:bg-gray-100">
                 <span className="material-symbols-outlined" style={{ color: '#464652' }}>more_vert</span>
               </button>
@@ -383,9 +420,16 @@ export function SmartProctorPage() {
               </div>
             )}
 
-            {/* Error */}
+            {/* Errors */}
             {fileError && (
               <p className="mb-2 text-xs font-semibold px-1" style={{ color: '#ba1a1a' }}>{fileError}</p>
+            )}
+            {voice.voiceError && (
+              <div className="mb-2 flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold"
+                style={{ backgroundColor: '#ffdad6', color: '#93000a' }}>
+                <span>{voice.voiceError}</span>
+                <button onClick={voice.clearVoiceError} className="flex-shrink-0 font-bold hover:opacity-70">✕</button>
+              </div>
             )}
 
             <div className="flex items-center rounded-full px-3 py-1.5 shadow-sm border focus-within:ring-2 transition-all"
@@ -409,9 +453,27 @@ export function SmartProctorPage() {
                 style={{ color: '#191c1e', outline: 'none' }}
               />
               <div className="flex items-center gap-1 pr-1">
-                <button className="p-2 transition-colors hover:text-[#0c1282]" style={{ color: '#464652' }}>
-                  <span className="material-symbols-outlined">mic</span>
-                </button>
+                {voice.supported && (
+                  <div className="flex flex-col items-center">
+                    <button
+                      onClick={handleMicClick}
+                      className={`p-1.5 transition-colors hover:text-[#0c1282] rounded-t ${voice.isListening ? 'text-red-500' : ''}`}
+                      style={{ color: voice.isListening ? undefined : '#464652' }}
+                      title={voice.isListening ? 'Stop listening' : `Speak (${voice.lang === 'en-US' ? 'English' : 'Bengali'})`}>
+                      <span className={`material-symbols-outlined${voice.isListening ? ' animate-pulse' : ''}`}
+                        style={{ fontVariationSettings: "'FILL' 1" }}>
+                        {voice.isListening ? 'mic_off' : 'mic'}
+                      </span>
+                    </button>
+                    <button
+                      onClick={voice.toggleLang}
+                      className="text-[9px] font-bold px-1 rounded-b transition-colors hover:opacity-70"
+                      style={{ color: '#464652', backgroundColor: 'rgba(0,0,0,0.05)' }}
+                      title={voice.lang === 'en-US' ? 'Switch to Bengali' : 'Switch to English'}>
+                      {voice.lang === 'en-US' ? 'EN' : 'বাং'}
+                    </button>
+                  </div>
+                )}
                 <button
                   onClick={() => send()}
                   disabled={(!input.trim() && !attachedFile) || loading}

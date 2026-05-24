@@ -1,7 +1,5 @@
-databases:
-  - name: diu-db
-    databaseName: university_automation
-    plan: free
+# Database is now hosted on Supabase (not Render)
+# Connection credentials are set as env vars on diu-spring-api below.
 
 services:
   # ── Python AI Microservice ───────────────────────────────────────────────────
@@ -41,26 +39,17 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
+      # ── Supabase PostgreSQL ────────────────────────────────────────────────
       - key: DB_HOST
-        fromDatabase:
-          name: diu-db
-          property: host
+        value: db.rkczcdhdzdpmdfzakrtu.supabase.co
       - key: DB_PORT
-        fromDatabase:
-          name: diu-db
-          property: port
+        value: "5432"
       - key: DB_NAME
-        fromDatabase:
-          name: diu-db
-          property: database
+        value: postgres
       - key: DB_USERNAME
-        fromDatabase:
-          name: diu-db
-          property: user
+        value: postgres
       - key: DB_PASSWORD
-        fromDatabase:
-          name: diu-db
-          property: password
+        sync: false   # Set this manually in Render Dashboard → diu-spring-api → Environment
       - key: JWT_SECRET
         sync: false
       - key: PYTHON_SERVICE_URL

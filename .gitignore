@@ -31,3 +31,9 @@ department details/
 
 # PDF / binary uploads
 *.pdf
+
+# Local dev log files
+flask_*.txt
+
+# Local env files with credentials (never commit)
+backend-spring-boot/.env*

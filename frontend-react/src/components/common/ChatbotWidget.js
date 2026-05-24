@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAI } from '../../hooks/useAI';
+import { useVoice } from '../../hooks/useVoice';
 import { readFileForChat, getFileIcon, analyzeImageWithVision } from '../../utils/fileReader';
 
 // ── Field definitions ──────────────────────────────────────────────
@@ -170,7 +171,7 @@ const MessageList = ({ messages, isLoading, messagesEndRef }) => (
 );
 
 // ── Chat input ─────────────────────────────────────────────────────
-const ChatInput = ({ inputValue, setInputValue, isLoading, handleSubmitWithFile, autoFocus, placeholder }) => {
+const ChatInput = ({ inputValue, setInputValue, isLoading, handleSubmitWithFile, autoFocus, placeholder, onMicClick, isListening, voiceSupported, voiceError, onClearVoiceError, lang, onLangToggle }) => {
   const [attachedFile, setAttachedFile] = useState(null);
   const [fileError, setFileError]       = useState('');
   const fileInputRef = useRef(null);
@@ -220,6 +221,12 @@ const ChatInput = ({ inputValue, setInputValue, isLoading, handleSubmitWithFile,
         </div>
       )}
       {fileError && <p className="px-4 pt-1 text-[11px] font-semibold" style={{ color: '#ba1a1a' }}>{fileError}</p>}
+      {voiceError && (
+        <div className="px-4 pt-1 flex items-center justify-between gap-2">
+          <p className="text-[11px] font-semibold" style={{ color: '#ba1a1a' }}>{voiceError}</p>
+          <button onClick={onClearVoiceError} className="text-[10px] text-outline hover:text-on-surface">✕</button>
+        </div>
+      )}
 
       <form onSubmit={onSubmit} className="p-4 flex gap-2">
         {/* Hidden file input */}
@@ -245,11 +252,34 @@ const ChatInput = ({ inputValue, setInputValue, isLoading, handleSubmitWithFile,
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          placeholder={attachedFile ? 'Add a message (optional)…' : (placeholder || 'Ask about admissions, programs, fees...')}
+          placeholder={isListening ? '🎤 Listening…' : (attachedFile ? 'Add a message (optional)…' : (placeholder || 'Ask about admissions, programs, fees...'))}
           disabled={isLoading}
           autoFocus={autoFocus}
           className="flex-1 px-4 py-2.5 bg-surface-container-low border border-outline-variant/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
         />
+        {voiceSupported && (
+          <div className="flex flex-col items-center flex-shrink-0 gap-0.5">
+            <button
+              type="button"
+              onClick={onMicClick}
+              className={`w-10 h-9 rounded-t-xl flex items-center justify-center transition-all ${isListening ? 'bg-red-100 text-red-500' : 'bg-surface-container-low text-outline hover:text-primary hover:bg-primary/10'}`}
+              title={isListening ? 'Stop listening' : `Speak your message (${lang === 'en-US' ? 'English' : 'Bengali'})`}>
+              <span className={`material-symbols-outlined text-base${isListening ? ' animate-pulse' : ''}`}
+                style={{ fontVariationSettings: "'FILL' 1" }}>
+                {isListening ? 'mic_off' : 'mic'}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={onLangToggle}
+              className="w-10 h-5 rounded-b-xl flex items-center justify-center bg-surface-container-low hover:bg-primary/10 transition-all"
+              title={lang === 'en-US' ? 'Switch to Bengali (বাংলা)' : 'Switch to English'}>
+              <span className="text-[9px] font-bold text-outline" style={{ letterSpacing: '-0.3px' }}>
+                {lang === 'en-US' ? 'EN' : 'বাং'}
+              </span>
+            </button>
+          </div>
+        )}
         <button
           type="submit"
           disabled={isLoading || (!inputValue.trim() && !attachedFile)}
@@ -263,7 +293,7 @@ const ChatInput = ({ inputValue, setInputValue, isLoading, handleSubmitWithFile,
 };
 
 // ── Fullscreen chat ────────────────────────────────────────────────
-const FullscreenChat = ({ onMinimize, onClose, messages, inputValue, setInputValue, isLoading, handleSubmit, handleSubmitWithFile, sendMessage, formMode, formProgress, formFieldIndex, totalFormFields, startFormMode }) => {
+const FullscreenChat = ({ onMinimize, onClose, messages, inputValue, setInputValue, isLoading, handleSubmit, handleSubmitWithFile, sendMessage, formMode, formProgress, formFieldIndex, totalFormFields, startFormMode, voiceProps = {} }) => {
   const messagesEndRef = React.useRef(null);
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -292,6 +322,15 @@ const FullscreenChat = ({ onMinimize, onClose, messages, inputValue, setInputVal
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {voiceProps.voiceSupported && (
+            <button onClick={voiceProps.onVoiceToggle}
+              title={voiceProps.voiceOn ? 'Turn off voice' : 'Turn on voice (bot speaks responses)'}
+              className={`p-2 rounded-lg hover:bg-white/20 transition-all text-white ${voiceProps.voiceOn ? 'bg-white/20' : ''}`}>
+              <span className="material-symbols-outlined text-base">
+                {voiceProps.isSpeaking ? 'volume_up' : voiceProps.voiceOn ? 'volume_down' : 'volume_off'}
+              </span>
+            </button>
+          )}
           <button onClick={onMinimize} title="Minimize" className="p-2 rounded-lg hover:bg-white/20 transition-all text-white">
             <span className="material-symbols-outlined">remove</span>
           </button>
@@ -408,7 +447,10 @@ const FullscreenChat = ({ onMinimize, onClose, messages, inputValue, setInputVal
           )}
           <MessageList messages={messages} isLoading={isLoading} messagesEndRef={messagesEndRef} />
           <ChatInput inputValue={inputValue} setInputValue={setInputValue} isLoading={isLoading} handleSubmitWithFile={handleSubmitWithFile}
-            autoFocus placeholder={formMode ? 'Type your answer... (or "cancel" to stop)' : undefined} />
+            autoFocus placeholder={formMode ? 'Type your answer... (or "cancel" to stop)' : undefined}
+            onMicClick={voiceProps.onMicClick} isListening={voiceProps.isListening} voiceSupported={voiceProps.voiceSupported}
+            voiceError={voiceProps.voiceError} onClearVoiceError={voiceProps.onClearVoiceError}
+            lang={voiceProps.lang} onLangToggle={voiceProps.onLangToggle} />
         </div>
       </div>
     </div>
@@ -613,12 +655,51 @@ Give personalized, practical career advice based on this profile. If the student
 export const ChatbotWidget = ({ pageContext = 'general', studentProfile = null }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const messagesEndRef = React.useRef(null);
-  const chat = useChatMessages(pageContext, studentProfile);
+  const messagesEndRef  = React.useRef(null);
+  const lastBotMsgRef   = React.useRef(null);
+  const chat  = useChatMessages(pageContext, studentProfile);
+  const voice = useVoice();
 
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chat.messages, chat.isLoading]);
+
+  // Sync interim speech transcript → input field
+  React.useEffect(() => {
+    if (voice.transcript) chat.setInputValue(voice.transcript);
+  }, [voice.transcript]); // eslint-disable-line
+
+  // Auto-speak new bot messages when voice output is enabled
+  React.useEffect(() => {
+    if (!voice.voiceOn) return;
+    const last = chat.messages[chat.messages.length - 1];
+    if (!last || last.type !== 'bot') return;
+    if (last.id === lastBotMsgRef.current) return;
+    lastBotMsgRef.current = last.id;
+    voice.speak(last.text);
+  }, [chat.messages, voice.voiceOn]); // eslint-disable-line
+
+  const handleMicClick = () => {
+    if (voice.isListening) { voice.stopListening(); return; }
+    // Always fill input — user reviews what was heard and presses Enter/Send.
+    // Never auto-send: recognition errors can corrupt form data or send wrong messages.
+    voice.startListening((t) => {
+      chat.setInputValue(t);
+    });
+  };
+
+  const voiceProps = {
+    onMicClick:       handleMicClick,
+    onVoiceToggle:    voice.toggleVoice,
+    onLangToggle:     voice.toggleLang,
+    onClearVoiceError: voice.clearVoiceError,
+    isListening:      voice.isListening,
+    isSpeaking:       voice.isSpeaking,
+    voiceOn:          voice.voiceOn,
+    voiceSupported:   voice.supported,
+    voiceError:       voice.voiceError,
+    lang:             voice.lang,
+  };
 
   // Context-aware label for form buttons
   const contextFormMode = pageContext === 'pre-register' ? 'pre-register' : pageContext === 'online-admit' ? 'online-admit' : null;
@@ -640,6 +721,7 @@ export const ChatbotWidget = ({ pageContext = 'general', studentProfile = null }
         formFieldIndex={chat.formFieldIndex}
         totalFormFields={chat.totalFormFields}
         startFormMode={chat.startFormMode}
+        voiceProps={voiceProps}
       />
     );
   }
@@ -661,6 +743,15 @@ export const ChatbotWidget = ({ pageContext = 'general', studentProfile = null }
               </div>
             </div>
             <div className="flex items-center gap-0.5">
+              {voice.supported && (
+                <button onClick={voice.toggleVoice}
+                  title={voice.voiceOn ? 'Voice output ON — click to turn off' : 'Turn on voice (bot speaks responses)'}
+                  className={`p-1.5 rounded-lg hover:bg-white/20 transition-all ${voice.voiceOn ? 'bg-white/20' : ''}`}>
+                  <span className="material-symbols-outlined text-base">
+                    {voice.isSpeaking ? 'volume_up' : voice.voiceOn ? 'volume_down' : 'volume_off'}
+                  </span>
+                </button>
+              )}
               <button onClick={() => setIsFullscreen(true)} title="Full screen" className="p-1.5 rounded-lg hover:bg-white/20 transition-all">
                 <span className="material-symbols-outlined text-base">open_in_full</span>
               </button>
@@ -727,6 +818,13 @@ export const ChatbotWidget = ({ pageContext = 'general', studentProfile = null }
             isLoading={chat.isLoading}
             handleSubmitWithFile={chat.handleSubmitWithFile}
             placeholder={chat.formMode ? 'Type your answer... (or "cancel" to stop)' : undefined}
+            onMicClick={handleMicClick}
+            isListening={voice.isListening}
+            voiceSupported={voice.supported}
+            voiceError={voice.voiceError}
+            onClearVoiceError={voice.clearVoiceError}
+            lang={voice.lang}
+            onLangToggle={voice.toggleLang}
           />
         </div>
       )}

@@ -150,6 +150,15 @@ def _collect_documents() -> list[dict]:
                 "department": "",
             })
 
+    # Live web-scraped data from official DIU pages
+    try:
+        from app.services.web_scraper_service import all_scraped_rag_docs
+        scraped = all_scraped_rag_docs()
+        docs.extend(scraped)
+        logger.info("Added %d web-scraped docs (scholarships + fees + faculty)", len(scraped))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Web scraping for RAG skipped: %s", e)
+
     return docs
 
 

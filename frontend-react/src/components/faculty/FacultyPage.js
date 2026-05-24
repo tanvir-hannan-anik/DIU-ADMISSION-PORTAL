@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navigation } from '../common/Navigation';
 import { Footer } from '../common/Footer';
+import { liveDataService } from '../../services/liveDataService';
 
 const FACULTY_DATA = {
   CIS: [
@@ -75,6 +76,42 @@ export const FacultyPage = () => {
   const departments = Object.keys(FACULTY_DATA);
   const [activeDept, setActiveDept] = useState('CIS');
   const [search, setSearch] = useState('');
+
+  // Live faculty data from DIU website
+  const [liveData,       setLiveData]       = useState(null);
+  const [liveLoading,    setLiveLoading]     = useState(true);
+  const [liveError,      setLiveError]       = useState('');
+  const [liveRefreshing, setLiveRefreshing]  = useState(false);
+  const [showLive,       setShowLive]        = useState(false);
+  const [liveSearch,     setLiveSearch]      = useState('');
+  const [expandedProfile, setExpandedProfile] = useState(null);
+
+  useEffect(() => {
+    liveDataService.getFacultyList().then(res => {
+      setLiveLoading(false);
+      if (res.success && res.data) setLiveData(res.data);
+      else setLiveError(res.error || 'Could not load live faculty data');
+    });
+  }, []);
+
+  const handleLiveRefresh = async () => {
+    setLiveRefreshing(true);
+    setLiveError('');
+    const res = await liveDataService.getFacultyList(true);
+    setLiveRefreshing(false);
+    if (res.success && res.data) setLiveData(res.data);
+    else setLiveError(res.error || 'Refresh failed');
+  };
+
+  const filteredLiveFaculty = (liveData?.faculty || []).filter(f => {
+    if (!liveSearch) return true;
+    const q = liveSearch.toLowerCase();
+    return (
+      (f.name || '').toLowerCase().includes(q) ||
+      (f.department || '').toLowerCase().includes(q) ||
+      (f.designation || '').toLowerCase().includes(q)
+    );
+  });
 
   const colors = DEPT_COLORS[activeDept] || DEPT_COLORS.CIS;
   const teachers = (FACULTY_DATA[activeDept] || []).filter(t =>
@@ -221,6 +258,181 @@ export const FacultyPage = () => {
               </div>
             )}
 
+          </div>
+        </div>
+
+        {/* ── Live Faculty Directory from DIU Website ── */}
+        <div className="px-4 md:px-8 pb-14">
+          <div className="max-w-screen-2xl mx-auto">
+            <div className="border-t border-outline-variant/20 pt-10">
+              <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+                <div>
+                  <button
+                    onClick={() => setShowLive(v => !v)}
+                    className="flex items-center gap-2 group"
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse inline-block" />
+                    <h2 className="font-headline text-xl font-bold text-on-surface group-hover:text-primary transition-colors">
+                      Live Faculty Directory from DIU
+                    </h2>
+                    <span className="material-symbols-outlined text-outline text-base transition-transform" style={{ transform: showLive ? 'rotate(180deg)' : 'none' }}>
+                      expand_more
+                    </span>
+                  </button>
+                  <p className="text-sm text-outline mt-0.5 ml-5">
+                    Real-time data from{' '}
+                    <a href="https://faculty.daffodilvarsity.edu.bd/" target="_blank" rel="noopener noreferrer"
+                      className="text-primary underline underline-offset-2">
+                      faculty.daffodilvarsity.edu.bd
+                    </a>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {liveData?.fetched_at && (
+                    <span className="text-xs text-outline flex items-center gap-1">
+                      <span className="material-symbols-outlined text-sm">schedule</span>
+                      {liveData.fetched_at}
+                    </span>
+                  )}
+                  <button
+                    onClick={handleLiveRefresh}
+                    disabled={liveRefreshing}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-white hover:bg-primary/85 disabled:opacity-50 transition-colors"
+                  >
+                    <span className={`material-symbols-outlined text-sm ${liveRefreshing ? 'animate-spin' : ''}`}>refresh</span>
+                    {liveRefreshing ? 'Refreshing…' : 'Refresh'}
+                  </button>
+                </div>
+              </div>
+
+              {showLive && (
+                <>
+                  {liveLoading && (
+                    <div className="bg-white rounded-2xl border border-outline-variant/20 p-8 text-center">
+                      <div className="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
+                      <p className="text-xs text-outline">Fetching live faculty data…</p>
+                    </div>
+                  )}
+
+                  {!liveLoading && liveError && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-3">
+                      <span className="material-symbols-outlined text-amber-500 text-xl mt-0.5">warning</span>
+                      <div>
+                        <p className="text-sm font-semibold text-amber-700">Could not load live faculty data</p>
+                        <p className="text-xs text-amber-600 mt-0.5">{liveError}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {!liveLoading && liveData?.success && (
+                    <>
+                      {/* Search live faculty */}
+                      <div className="flex items-center gap-3 mb-5">
+                        <div className="relative flex-1 max-w-sm">
+                          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-base">search</span>
+                          <input
+                            type="text"
+                            value={liveSearch}
+                            onChange={e => setLiveSearch(e.target.value)}
+                            placeholder="Search live faculty…"
+                            className="w-full pl-9 pr-4 py-2.5 bg-surface-container-low border border-outline-variant/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
+                          />
+                        </div>
+                        <span className="text-xs text-outline">
+                          {filteredLiveFaculty.length} of {liveData.faculty?.length || 0} members
+                        </span>
+                      </div>
+
+                      {filteredLiveFaculty.length === 0 && !liveData.faculty?.length && liveData.raw_text && (
+                        <div className="bg-white rounded-2xl border border-outline-variant/20 p-5">
+                          <p className="text-xs font-semibold text-outline mb-2">Raw faculty directory content:</p>
+                          <pre className="text-xs text-on-surface-variant whitespace-pre-wrap leading-relaxed font-sans">
+                            {liveData.raw_text.slice(0, 4000)}
+                          </pre>
+                        </div>
+                      )}
+
+                      {filteredLiveFaculty.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                          {filteredLiveFaculty.map((member, i) => (
+                            <div
+                              key={i}
+                              className="bg-white rounded-2xl border border-outline-variant/20 p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer"
+                              onClick={() => setExpandedProfile(expandedProfile === i ? null : i)}
+                            >
+                              <div className="flex items-start gap-3 mb-3">
+                                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-sm font-black font-headline flex-shrink-0">
+                                  {member.name
+                                    ? member.name.replace(/^(Mr\.|Ms\.|Dr\.|Prof\.)\s*/i, '').split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
+                                    : '?'}
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="font-bold text-on-surface text-sm leading-snug line-clamp-2">{member.name || 'Unknown'}</h4>
+                                  {member.designation && (
+                                    <span className="inline-block mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                                      {member.designation}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {member.department && (
+                                <p className="text-xs text-outline mb-2 flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-xs">apartment</span>
+                                  {member.department}
+                                </p>
+                              )}
+
+                              {member.profile_url && (
+                                <a
+                                  href={member.profile_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={e => e.stopPropagation()}
+                                  className="text-[10px] text-primary underline underline-offset-2"
+                                >
+                                  View official profile →
+                                </a>
+                              )}
+
+                              {/* Expanded detail fields */}
+                              {expandedProfile === i && (
+                                <div className="mt-3 pt-3 border-t border-outline-variant/20 space-y-2">
+                                  {[
+                                    ['academic_qualification', 'school', 'Qualifications'],
+                                    ['teaching_research_interest', 'science', 'Research Interests'],
+                                    ['publications', 'article', 'Publications'],
+                                    ['memberships', 'groups', 'Memberships'],
+                                    ['training_experience', 'work', 'Experience'],
+                                    ['previous_employment', 'business_center', 'Previous Employment'],
+                                    ['personal_info', 'person', 'About'],
+                                  ].map(([field, icon, label]) =>
+                                    member[field] ? (
+                                      <div key={field}>
+                                        <div className="flex items-center gap-1 text-[10px] font-bold text-outline uppercase tracking-wider mb-0.5">
+                                          <span className="material-symbols-outlined text-xs">{icon}</span>
+                                          {label}
+                                        </div>
+                                        <p className="text-xs text-on-surface-variant leading-relaxed">{member[field]}</p>
+                                      </div>
+                                    ) : null
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <p className="text-xs text-outline mt-4 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-sm">info</span>
+                        Data sourced directly from DIU's official faculty directory. Cached for 1 hour. Click a card to expand profile details.
+                      </p>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       </main>

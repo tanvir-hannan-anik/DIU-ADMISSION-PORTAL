@@ -13,6 +13,14 @@ const API_CONFIG = {
 };
 
 export const API_ENDPOINTS = {
+  LIVE: {
+    SCHOLARSHIPS:    '/api/v1/live/scholarships',
+    TUITION_FEES:    '/api/v1/live/tuition-fees',
+    FACULTY:         '/api/v1/live/faculty',
+    FACULTY_PROFILE: '/api/v1/live/faculty/profile',
+    REFRESH:         '/api/v1/live/refresh',
+    REFRESH_RAG:     '/api/v1/live/refresh-rag',
+  },
   AUTH: {
     LOGIN: '/v1/auth/login',
     SIGNUP: '/v1/auth/signup',

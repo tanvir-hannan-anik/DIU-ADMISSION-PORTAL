@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
+import { useVoice } from '../../hooks/useVoice';
 import { readFileForChat, getFileIcon, analyzeImageWithVision } from '../../utils/fileReader';
 
 /**
@@ -26,9 +27,11 @@ export const SmartAdvisorFullscreen = ({
   const initials  = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'ST';
   const messagesEndRef = useRef(null);
   const fileInputRef   = useRef(null);
+  const lastSpokenRef  = useRef(-1);
   const [attachedFile, setAttachedFile] = useState(null);
   const [fileError, setFileError]       = useState('');
   const [fileLoading, setFileLoading]   = useState(false);
+  const voice = useVoice();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -38,6 +41,30 @@ export const SmartAdvisorFullscreen = ({
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
+
+  // Auto-speak new assistant messages when voice output is on
+  useEffect(() => {
+    if (!voice.voiceOn) return;
+    const idx = chatMsgs.length - 1;
+    const last = chatMsgs[idx];
+    if (!last || last.role !== 'assistant') return;
+    if (idx === lastSpokenRef.current) return;
+    lastSpokenRef.current = idx;
+    voice.speak(last.content);
+  }, [chatMsgs, voice.voiceOn]); // eslint-disable-line
+
+  // Sync interim speech transcript → chat input field
+  useEffect(() => {
+    if (voice.transcript) setChatInput(voice.transcript);
+  }, [voice.transcript]); // eslint-disable-line
+
+  const handleMicClick = () => {
+    if (voice.isListening) { voice.stopListening(); return; }
+    // Fill input — user reviews before sending (prevents sending mis-recognized text)
+    voice.startListening((t) => {
+      setChatInput(t);
+    });
+  };
 
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
@@ -420,9 +447,16 @@ export const SmartAdvisorFullscreen = ({
             </div>
           )}
 
-          {/* Error */}
+          {/* Errors */}
           {fileError && (
             <p className="max-w-4xl mx-auto mb-2 text-xs font-semibold" style={{ color: '#ba1a1a' }}>{fileError}</p>
+          )}
+          {voice.voiceError && (
+            <div className="max-w-4xl mx-auto mb-2 flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
+              style={{ backgroundColor: '#ffdad6', color: '#93000a' }}>
+              <span>{voice.voiceError}</span>
+              <button onClick={voice.clearVoiceError} className="flex-shrink-0 font-bold hover:opacity-70">✕</button>
+            </div>
           )}
 
           <div className="max-w-4xl mx-auto flex items-center gap-4">
@@ -450,14 +484,29 @@ export const SmartAdvisorFullscreen = ({
                 onBlur={e => e.currentTarget.style.boxShadow = 'none'}
               />
 
-              {/* Mic + Send */}
-              <div className="absolute right-2 flex gap-1">
-                <button className="p-2 transition-colors"
-                  style={{ color: '#9ca3af' }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#0c1282'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}>
-                  <span className="material-symbols-outlined">mic</span>
-                </button>
+              {/* Mic + Lang toggle + Send */}
+              <div className="absolute right-2 flex gap-1 items-center">
+                {voice.supported && (
+                  <div className="flex flex-col items-center">
+                    <button
+                      onClick={handleMicClick}
+                      className={`p-1.5 transition-colors rounded-t ${voice.isListening ? 'text-red-500' : ''}`}
+                      style={{ color: voice.isListening ? undefined : '#9ca3af' }}
+                      title={voice.isListening ? 'Stop listening' : `Speak (${voice.lang === 'en-US' ? 'English' : 'Bengali'})`}>
+                      <span className={`material-symbols-outlined${voice.isListening ? ' animate-pulse' : ''}`}
+                        style={{ fontVariationSettings: "'FILL' 1" }}>
+                        {voice.isListening ? 'mic_off' : 'mic'}
+                      </span>
+                    </button>
+                    <button
+                      onClick={voice.toggleLang}
+                      className="text-[9px] font-bold px-1 rounded-b transition-colors"
+                      style={{ color: '#9ca3af', backgroundColor: 'rgba(0,0,0,0.04)' }}
+                      title={voice.lang === 'en-US' ? 'Switch to Bengali' : 'Switch to English'}>
+                      {voice.lang === 'en-US' ? 'EN' : 'বাং'}
+                    </button>
+                  </div>
+                )}
                 <button
                   onClick={handleSend}
                   disabled={(chatLoading || fileLoading) || (!chatInput.trim() && !attachedFile)}
@@ -482,13 +531,13 @@ export const SmartAdvisorFullscreen = ({
                 const a    = Object.assign(document.createElement('a'), { href: url, download: 'smart-advisor-transcript.txt' });
                 a.click(); URL.revokeObjectURL(url);
               }},
-              { label: 'Voice Mode',       onClick: () => {} },
+              { label: voice.voiceOn ? (voice.isSpeaking ? '🔊 Speaking…' : '🎙 Voice ON') : 'Voice Mode', onClick: voice.supported ? voice.toggleVoice : undefined },
             ].map(({ label, onClick }) => (
               <button key={label} onClick={onClick}
                 className="text-xs font-bold uppercase tracking-widest transition-colors"
-                style={{ color: 'rgba(70,70,82,0.4)' }}
+                style={{ color: (label.includes('Voice ON') || label.includes('Speaking')) ? '#0c1282' : 'rgba(70,70,82,0.4)' }}
                 onMouseEnter={e => e.currentTarget.style.color = '#0c1282'}
-                onMouseLeave={e => e.currentTarget.style.color = 'rgba(70,70,82,0.4)'}>
+                onMouseLeave={e => e.currentTarget.style.color = (label.includes('Voice ON') || label.includes('Speaking')) ? '#0c1282' : 'rgba(70,70,82,0.4)'}>
                 {label}
               </button>
             ))}

@@ -16,6 +16,79 @@ ANSWER_FORMAT_RULES = """ANSWER FORMATTING (STRICT — follow in every reply):
 - For unordered lists use '- ' bullet points.
 - Keep replies clean and scannable: short paragraphs with a blank line between sections."""
 
+# ── Structured response templates (applied in RAG mode) ──────────────────────
+STRUCTURED_TEMPLATES = """
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STRUCTURED RESPONSE TEMPLATES (always follow these formats)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TEMPLATE 1 — DEPARTMENT QUERY ("Tell me about [Dept]", "What is CSE?", etc.)
+──────────────────────────────────────────────────────────────────────────────
+**[Department Full Name] ([Short Code])**
+
+**Overview:** [2–3 sentence description from retrieved context]
+
+**Tuition Fee:** [Fee structure from live tuition fee data in context]
+
+**Scholarships Available:** [Relevant scholarship/waiver from context]
+
+Then ASK: "Would you like to know about:
+👨‍🏫 Faculty Members | 📚 Course Catalog | 💰 Fee & Waiver | 🎓 Scholarships | 📬 Contact"
+
+If user says YES to Faculty Members → show faculty using TEMPLATE 3.
+NEVER dump all sections at once; always ask first and wait for user choice.
+
+TEMPLATE 2 — FEE / TUITION QUERY
+──────────────────────────────────────────────────────────────────────────────
+**[Department Name] — Fee Structure**
+
+| Fee Type           | Amount (BDT) |
+|--------------------|-------------|
+| Semester Tuition   | [value]     |
+| Admission Fee      | [value]     |
+| Total Program Cost | [value]     |
+
+**Waiver Available:** [waiver % and eligibility from context]
+**Note:** [any conditional note]
+
+TEMPLATE 3 — FACULTY QUERY ("Who are the teachers of [Dept]?")
+──────────────────────────────────────────────────────────────────────────────
+**[Department Name] — Faculty Members**
+
+[For each faculty member from context:]
+- **[Name]** — [Designation]
+  - Research/Teaching Interest: [if available]
+  - Qualifications: [if available]
+
+TEMPLATE 4 — SCHOLARSHIP QUERY
+──────────────────────────────────────────────────────────────────────────────
+**DIU Scholarship & Waiver Programs**
+
+[For each scholarship/waiver from live scraped context:]
+- **[Scholarship Name]:** [Eligibility criteria] → [Amount / Waiver %] | [Min SGPA to maintain]
+
+TEMPLATE 5 — ELIGIBILITY CHECK ("Am I eligible for CSE?")
+──────────────────────────────────────────────────────────────────────────────
+**Eligibility Check — [Department]**
+
+✅ **Status:** Eligible / ❌ Not Eligible
+
+**Reason:** [SSC GPA: X | HSC GPA: Y | Group: Z — matches/does not match requirement]
+
+**Requirement:** [exact requirement from context]
+
+[If not eligible:] **Alternative:** [suggest another dept they qualify for]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+LIVE DATA NOTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The RETRIEVED CONTEXT below includes LIVE data fetched from:
+- https://daffodilvarsity.edu.bd/scholarship/diu-scholarship  (scholarship info)
+- https://daffodilvarsity.edu.bd/tuition-fees                 (fee structure)
+- https://faculty.daffodilvarsity.edu.bd/                     (faculty directory)
+Always prefer this live data over any static knowledge you may have.
+"""
+
 # Slim, RAG-grounded prompt. Facts come from retrieved context — NOT baked in.
 RAG_SYSTEM_PROMPT = """You are DIU Advisor — the official AI admission counselor for Daffodil International University (DIU), Dhaka, Bangladesh. You are a smart, friendly, confident, professional academic counselor whose goal is to guide students to the right department and a successful admission.
 
@@ -44,6 +117,11 @@ COUNSELING BEHAVIOUR
 - Eligibility checks: state Eligible / Not Eligible, the reason, and an alternative if not eligible.
 - Comparisons: use a markdown table (tuition, job demand, difficulty, facilities, career scope) then state the single best choice for the student.
 - For a broad question about one department, give a 3–5 line overview first, then offer: Faculty | Course Catalog | Alumni | Research & Labs | Fee & Waiver.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RESPONSE TEMPLATES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{STRUCTURED_TEMPLATES}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FORMAT & TONE
@@ -542,6 +620,7 @@ class GroqService:
             logger.info("RAG retrieved %d chunks", len(result.get("hits", [])))
             rag_prompt = (
                 RAG_SYSTEM_PROMPT
+                .replace("{STRUCTURED_TEMPLATES}", STRUCTURED_TEMPLATES)
                 .replace("{ANSWER_FORMAT}", ANSWER_FORMAT_RULES)
                 .replace("{RETRIEVED_CONTEXT}", context)
             )
