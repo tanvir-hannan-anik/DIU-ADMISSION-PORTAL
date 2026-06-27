@@ -1,6 +1,6 @@
 # DIU University Automation Website — Project Memory
 
-> Auto-updated on every commit. Last updated: **2026-05-24**
+> Auto-updated on every commit. Last updated: **2026-06-27**
 
 ---
 
@@ -209,6 +209,8 @@ database/                ← PostgreSQL (Render free DB: university_automation)
 
 | Date | Commit | What Changed |
 |---|---|---|
+| 2026-06-27 | `30ff60e` | **Admin portal:** role-based auth + audit logging (Spring), dark analytics dashboard at `/admin` (React/recharts), seeded admin account; switch Supabase to Session Pooler (IPv4) in render.yaml; add setup guide + Supabase MCP |
+| 2026-06-?? | `7bee765` | Migrate to Supabase DB, add live RAG scraper, voice chat, structured chatbot templates |
 | 2026-05-15 | `6aac318` | Add Qdrant RAG integration, Firebase Google auth, compact auth UI, cleaner AI response formatting |
 | 2026-05-03 | `ef334b4` | Add JSearch live jobs API, fix chatbot two-mode system, update PESS faculty data |
 | 2026-04-20 | `61b5f8e` | **DB migration:** MySQL → PostgreSQL (Render free DB); H2 for local dev |
