@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { T } from '../theme';
 import { downloadCsv } from '../utils';
+import adminApi from '../adminApi';
 import Dropdown from '../components/Dropdown';
 import {
   KPIS, VISITOR_SOURCES, REALTIME_SERIES, DEVICE_BREAKDOWN, TOP_PAGES,
@@ -22,8 +23,29 @@ export default function AdminDashboard() {
   const [sourcePeriod, setSourcePeriod] = useState('This Week');
   const [pagesPeriod, setPagesPeriod] = useState('This Week');
   const [journeyPeriod, setJourneyPeriod] = useState('This Week');
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    adminApi.get('/v1/admin/stats').then((r) => setStats(r.data.data)).catch(() => {});
+  }, []);
 
   const sources = VISITOR_SOURCES.map((s, i) => ({ ...s, color: CHART_COLORS[i] }));
+
+  // KPI cards: Leads/Applications/Admitted/Conversion are LIVE from the DB;
+  // visitor metrics remain demo until the analytics pipeline (Phase 2).
+  const fmtNum = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n ?? '—'}`);
+  const kpiCards = [
+    KPIS[0], // Total Visitors (demo)
+    { id: 'leads', label: 'Total Leads', value: stats ? fmtNum(stats.totalLeads) : '…',
+      delta: stats?.newLeadsThisWeek ?? 0, up: true, color: '#A78BFA', data: KPIS[1].data, live: true },
+    { id: 'apps', label: 'Applications', value: stats ? fmtNum(stats.totalApplications) : '…',
+      delta: 0, up: true, color: '#34D399', data: KPIS[2].data, live: true },
+    { id: 'admitted', label: 'Admitted', value: stats ? fmtNum(stats.admittedApplications) : '…',
+      delta: 0, up: true, color: '#22D3EE', data: KPIS[4].data, live: true },
+    { id: 'conv', label: 'Conversion Rate', value: stats ? `${stats.applicationConversionRate ?? 0}%` : '…',
+      delta: 0, up: true, color: '#FBBF24', data: KPIS[3].data, live: true },
+    { ...KPIS[5], label: 'Online Visitors' }, // demo
+  ];
 
   const handleExport = () => {
     const rows = [
@@ -85,12 +107,12 @@ export default function AdminDashboard() {
         <div className="flex items-start gap-2 px-3 py-2 rounded-lg text-[12px]"
              style={{ backgroundColor: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#FBBF24' }}>
           <span className="material-symbols-outlined text-[16px] flex-shrink-0">info</span>
-          <span>Showing demo data — these widgets connect to live analytics in Phase 2 (event pipeline + PostHog/Clarity).</span>
+          <span>KPI cards with a green dot (Leads, Applications, Admitted, Conversion) are <b>live from your database</b>. Visitor charts below remain demo until the analytics pipeline (Phase 2).</span>
         </div>
 
         {/* KPI row */}
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
-          {KPIS.map((k) => <KpiCard key={k.id} {...k} />)}
+          {kpiCards.map((k) => <KpiCard key={k.id} {...k} />)}
         </div>
 
         {/* Row 2 */}

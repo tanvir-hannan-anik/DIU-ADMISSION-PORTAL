@@ -54,11 +54,14 @@ export function SelectPill({ value = 'This Week', options = ['Today', 'This Week
 }
 
 // ── KPI card with sparkline ───────────────────────────────────────────────────
-export function KpiCard({ label, value, delta, up, color, data }) {
+export function KpiCard({ label, value, delta, up, color, data, live }) {
   const gid = `spark-${label.replace(/\W/g, '')}`;
   return (
     <div className="rounded-2xl p-4 min-w-0 adm-card-shadow" style={{ backgroundColor: T.card, border: `1px solid ${T.border}` }}>
-      <p className="text-[12px] font-medium mb-2 truncate" style={{ color: T.textDim }}>{label}</p>
+      <p className="text-[12px] font-medium mb-2 truncate flex items-center gap-1.5" style={{ color: T.textDim }}>
+        {live && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: T.up }} title="Live data" />}
+        {label}
+      </p>
       <div className="flex flex-wrap items-end gap-x-2 gap-y-0.5">
         <span className="text-[24px] font-extrabold leading-none" style={{ color: T.text }}>{value}</span>
         <span className="flex items-center text-[12px] font-bold mb-0.5" style={{ color: up ? T.up : T.down }}>

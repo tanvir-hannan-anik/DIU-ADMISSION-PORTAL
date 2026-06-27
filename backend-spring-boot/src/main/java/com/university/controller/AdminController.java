@@ -5,6 +5,8 @@ import com.university.model.entity.AdminAuditLog;
 import com.university.model.entity.User;
 import com.university.repository.AdminAuditLogRepository;
 import com.university.repository.UserRepository;
+import com.university.service.AdmissionService;
+import com.university.service.LeadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -27,6 +29,8 @@ public class AdminController {
 
     private final UserRepository userRepository;
     private final AdminAuditLogRepository auditLogRepository;
+    private final LeadService leadService;
+    private final AdmissionService admissionService;
 
     /** Returns the current admin's identity — used by the frontend to confirm access. */
     @GetMapping("/me")
@@ -56,5 +60,36 @@ public class AdminController {
         body.put("totalPages", logs.getTotalPages());
         body.put("totalElements", logs.getTotalElements());
         return ResponseEntity.ok(ResponseWrapper.success(body));
+    }
+
+    /** Combined KPIs for the dashboard cards (leads + applications). */
+    @GetMapping("/stats")
+    public ResponseEntity<ResponseWrapper<Object>> stats() {
+        Map<String, Object> out = new HashMap<>(leadService.getLeadStats());
+        Map<String, Object> appStats = admissionService.getDashboardStats();
+        out.put("totalApplications", appStats.get("total"));
+        out.put("admittedApplications", appStats.get("admitted"));
+        out.put("pendingApplications", appStats.get("pending"));
+        out.put("applicationConversionRate", appStats.get("conversionRate"));
+        out.put("departmentBreakdown", appStats.get("departmentBreakdown"));
+        return ResponseEntity.ok(ResponseWrapper.success(out));
+    }
+
+    /** All admission applications (Application Tracking). */
+    @GetMapping("/applications")
+    public ResponseEntity<ResponseWrapper<Object>> applications() {
+        return ResponseEntity.ok(ResponseWrapper.success(admissionService.getAllApplications()));
+    }
+
+    /** Update an application's status (PENDING/REVIEWING/ADMITTED/REJECTED). */
+    @PutMapping("/applications/{appId}/status")
+    public ResponseEntity<ResponseWrapper<Object>> updateApplicationStatus(
+            @PathVariable String appId, @RequestBody Map<String, String> body) {
+        try {
+            return ResponseEntity.ok(ResponseWrapper.success(
+                    admissionService.updateStatus(appId, body.get("status"))));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ResponseWrapper.error(e.getMessage(), e.getMessage()));
+        }
     }
 }

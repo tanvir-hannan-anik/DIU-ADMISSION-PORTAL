@@ -17,10 +17,13 @@ public class AdmissionService {
 
     private final AdmissionApplicationRepository repository;
     private final EmailService emailService;
+    private final LeadService leadService;
 
-    public AdmissionService(AdmissionApplicationRepository repository, EmailService emailService) {
+    public AdmissionService(AdmissionApplicationRepository repository, EmailService emailService,
+                            LeadService leadService) {
         this.repository = repository;
         this.emailService = emailService;
+        this.leadService = leadService;
     }
 
     // ── Admission schedule per faculty ─────────────────────────
@@ -95,6 +98,15 @@ public class AdmissionService {
 
         AdmissionApplication saved = repository.save(app);
         emailService.sendApplicationReceived(saved);
+
+        // Capture/advance a CRM lead from this application (best-effort).
+        try {
+            var lead = leadService.capture(saved.getFullName(), saved.getEmail(),
+                    saved.getContactNumber(), saved.getProgram(), "APPLICATION", null);
+            leadService.updateStatus(lead.getId(), "SUBMITTED", "system");
+        } catch (Exception e) {
+            log.warn("Lead capture from application failed for {}: {}", saved.getEmail(), e.getMessage());
+        }
         return saved;
     }
 

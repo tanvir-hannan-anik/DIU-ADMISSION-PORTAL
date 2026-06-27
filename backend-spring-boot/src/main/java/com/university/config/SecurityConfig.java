@@ -28,6 +28,8 @@ public class SecurityConfig {
                 .requestMatchers("/v1/auth/**").permitAll()
                 .requestMatchers("/v1/admission/**").permitAll()
                 .requestMatchers("/v1/ai/**").permitAll()
+                // Public lead capture (website contact / request-info forms)
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/v1/leads").permitAll()
                 // Admin portal — every endpoint here requires the ADMIN role.
                 // Hiding the /admin URL is not security; this is the real gate.
                 .requestMatchers("/v1/admin/**").hasRole("ADMIN")

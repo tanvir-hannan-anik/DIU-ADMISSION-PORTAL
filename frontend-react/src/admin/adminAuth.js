@@ -16,7 +16,18 @@ export const adminAuth = {
     try {
       res = await adminApi.post('/v1/auth/login', { email: email.trim(), password });
     } catch (err) {
-      const code = err?.response?.data?.error || '';
+      // Distinguish "server problem" from "wrong credentials" so the message is useful.
+      if (!err.response) {
+        return { success: false, error: 'Cannot reach the server. It may be offline, suspended, or waking up — please try again in a minute.' };
+      }
+      const status = err.response.status;
+      if (status === 503) {
+        return { success: false, error: 'The server is unavailable (suspended or restarting on Render). Try again shortly.' };
+      }
+      if (status >= 500) {
+        return { success: false, error: 'Server error. Please try again in a moment.' };
+      }
+      const code = err.response.data?.error || '';
       return { success: false, error: ERROR_MESSAGES[code] || 'Login failed. Please try again.' };
     }
 

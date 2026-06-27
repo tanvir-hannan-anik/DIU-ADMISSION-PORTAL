@@ -6,6 +6,8 @@ import AdminLoginPage from './AdminLoginPage';
 import AdminLayout from './AdminLayout';
 import AdminDashboard from './pages/AdminDashboard';
 import AuditLogsPage from './pages/AuditLogsPage';
+import LeadsPage from './pages/LeadsPage';
+import ApplicationsPage from './pages/ApplicationsPage';
 import Placeholder from './pages/Placeholder';
 import { NAV_GROUPS, PLACEHOLDER_ROUTES } from './adminNav';
 import { T } from './theme';
@@ -46,6 +48,8 @@ export default function AdminApp() {
         <Routes>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="leads" element={<LeadsPage />} />
+          <Route path="applications" element={<ApplicationsPage />} />
           <Route path="audit" element={<AuditLogsPage />} />
           {PLACEHOLDER_ROUTES.map((n) => (
             <Route key={n.path} path={n.path}

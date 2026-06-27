@@ -25,8 +25,8 @@ export const NAV_GROUPS = [
   {
     title: 'Leads & CRM',
     items: [
-      { path: 'leads',        label: 'Leads',        icon: 'groups',          phase: 'Phase 1' },
-      { path: 'applications', label: 'Applications', icon: 'assignment',      phase: 'Phase 1' },
+      { path: 'leads',        label: 'Leads',        icon: 'groups',          live: true },
+      { path: 'applications', label: 'Applications', icon: 'assignment',      live: true },
       { path: 'followups',    label: 'Follow Ups',   icon: 'event_repeat',    phase: 'Phase 1' },
       { path: 'pipeline',     label: 'CRM Pipeline', icon: 'view_kanban',     phase: 'Phase 1' },
     ],
