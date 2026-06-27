@@ -209,6 +209,7 @@ database/                ← PostgreSQL (Render free DB: university_automation)
 
 | Date | Commit | What Changed |
 |---|---|---|
+| 2026-06-27 | `b44ebbb` | **Admin Phase 1 — Lead/CRM:** Lead/Counselor entities, public `/v1/leads` capture (admission submit auto-creates a lead), admin `/leads` `/stats` `/applications`; Leads + Applications pages; dashboard KPIs live from DB; clearer login errors |
 | 2026-06-27 | `30ff60e` | **Admin portal:** role-based auth + audit logging (Spring), dark analytics dashboard at `/admin` (React/recharts), seeded admin account; switch Supabase to Session Pooler (IPv4) in render.yaml; add setup guide + Supabase MCP |
 | 2026-06-?? | `7bee765` | Migrate to Supabase DB, add live RAG scraper, voice chat, structured chatbot templates |
 | 2026-05-15 | `6aac318` | Add Qdrant RAG integration, Firebase Google auth, compact auth UI, cleaner AI response formatting |
