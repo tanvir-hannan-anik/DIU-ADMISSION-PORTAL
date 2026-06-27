@@ -5,6 +5,7 @@ import com.university.model.entity.User;
 import com.university.repository.AdmittedStudentRepository;
 import com.university.repository.UserRepository;
 import com.university.security.JwtUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,8 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final LoginAttemptService loginAttemptService;
+    private final AuditService auditService;
 
     /**
      * Step 1: Register — check email in admitted_students, create unverified user, send demo link.
@@ -89,18 +92,44 @@ public class AuthService {
      * Step 4: Login — works for admitted students and self-registered users.
      */
     public Map<String, Object> login(String email, String rawPassword) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("INVALID_CREDENTIALS"));
+        return login(email, rawPassword, null);
+    }
+
+    public Map<String, Object> login(String email, String rawPassword, HttpServletRequest request) {
+        // Brute-force protection: reject early if this email is locked out.
+        if (loginAttemptService.isLocked(email)) {
+            auditService.record(email, "LOGIN_LOCKED",
+                    "Login attempted while locked", request);
+            throw new RuntimeException("ACCOUNT_LOCKED");
+        }
+
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            loginAttemptService.recordFailure(email);
+            auditService.record(email, "LOGIN_FAILURE", "No such user", request);
+            throw new RuntimeException("INVALID_CREDENTIALS");
+        }
 
         if (!Boolean.TRUE.equals(user.getVerified())) {
+            auditService.record(email, "LOGIN_FAILURE", "Account not verified", request);
             throw new RuntimeException("ACCOUNT_NOT_VERIFIED");
         }
 
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
+            loginAttemptService.recordFailure(email);
+            auditService.record(email, "LOGIN_FAILURE", "Bad password", request);
             throw new RuntimeException("INVALID_CREDENTIALS");
         }
 
-        String token = jwtUtil.generateToken(email);
+        loginAttemptService.recordSuccess(email);
+
+        String role = user.getRole() != null ? user.getRole() : "student";
+        String token = jwtUtil.generateToken(email, role);
+
+        // Audit successful admin logins specifically (feeds Login History).
+        if ("admin".equalsIgnoreCase(role)) {
+            auditService.record(email, "LOGIN_SUCCESS", "Admin login", request);
+        }
 
         java.util.Map<String, Object> userInfo = new java.util.HashMap<>();
         userInfo.put("email", user.getEmail());

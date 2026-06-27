@@ -63,9 +63,10 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<ResponseWrapper<Object>> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<ResponseWrapper<Object>> login(@Valid @RequestBody LoginRequest request,
+                                                         jakarta.servlet.http.HttpServletRequest httpRequest) {
         try {
-            var result = authService.login(request.getEmail(), request.getPassword());
+            var result = authService.login(request.getEmail(), request.getPassword(), httpRequest);
             return ResponseEntity.ok(ResponseWrapper.success(result));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest()

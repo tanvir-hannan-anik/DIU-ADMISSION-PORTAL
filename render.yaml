@@ -39,18 +39,29 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
-      # ── Supabase PostgreSQL ────────────────────────────────────────────────
+      # ── Supabase PostgreSQL (via SESSION POOLER) ───────────────────────────
+      # ⚠️ Do NOT use the direct host db.<ref>.supabase.co — it is IPv6-only and
+      # Render (IPv4) cannot reach it. Use the Session Pooler instead.
+      # Get exact values from: Supabase → Project Settings → Database →
+      # "Connection string" → tab "Session pooler".
       - key: DB_HOST
-        value: db.rkczcdhdzdpmdfzakrtu.supabase.co
+        value: aws-1-ap-southeast-2.pooler.supabase.com   # Supabase Session Pooler (IPv4)
       - key: DB_PORT
-        value: "5432"
+        value: "5432"   # session pooler port (use 5432; avoid 6543 transaction mode with Hibernate)
       - key: DB_NAME
         value: postgres
       - key: DB_USERNAME
-        value: postgres
+        value: postgres.rkczcdhdzdpmdfzakrtu   # pooler username INCLUDES the project ref
       - key: DB_PASSWORD
         sync: false   # Set this manually in Render Dashboard → diu-spring-api → Environment
       - key: JWT_SECRET
+        sync: false
+      # ── Admin portal account (seeded on boot, BCrypt-hashed) ───────────────
+      # Set both manually in Render Dashboard → diu-spring-api → Environment.
+      # Only the administrator should know these values.
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
         sync: false
       - key: PYTHON_SERVICE_URL
         fromService:

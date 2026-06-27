@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -22,6 +23,10 @@ import { FacultyPage }            from './components/faculty/FacultyPage';
 import { ScholarshipPage }        from './components/scholarship/ScholarshipPage';
 import { JobsPage }               from './components/jobs/JobsPage';
 import { SmartProctorPage }       from './components/proctor/SmartProctorPage';
+
+// Admin portal is lazy-loaded so its code never ships to public-site visitors
+// until someone navigates to /admin.
+const AdminApp = lazy(() => import('./admin/AdminApp'));
 
 // ── Protected route: redirects to /login if not authenticated ─────────────────
 function ProtectedRoute({ children }) {
@@ -72,6 +77,16 @@ function App() {
           <Route path="/scholarship" element={<ScholarshipPage />} />
           <Route path="/jobs"          element={<ProtectedRoute><JobsPage /></ProtectedRoute>} />
           <Route path="/smart-proctor" element={<ProtectedRoute><SmartProctorPage /></ProtectedRoute>} />
+
+          {/* Admin portal (lazy, self-contained, backend role-gated) */}
+          <Route
+            path="/admin/*"
+            element={
+              <Suspense fallback={<div className="flex h-screen items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" /></div>}>
+                <AdminApp />
+              </Suspense>
+            }
+          />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" />} />

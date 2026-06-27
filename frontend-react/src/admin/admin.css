@@ -1,0 +1,56 @@
+/* Admin theme tokens as CSS variables so the dark/light toggle actually works
+   without rewriting every component. Components reference these via theme.js (T). */
+.admin-scope {
+  --adm-bg: #0A0E17;
+  --adm-panel: #0E1320;
+  --adm-card: #141A28;
+  --adm-card-hover: #19202F;
+  --adm-border: rgba(148, 163, 184, 0.12);
+  --adm-border-strong: rgba(148, 163, 184, 0.22);
+  --adm-text: #E6EAF2;
+  --adm-text-dim: #8A94A6;
+  --adm-text-faint: #5B647A;
+  --adm-accent: #6366F1;
+  --adm-accent-soft: rgba(99, 102, 241, 0.15);
+  --adm-up: #34D399;
+  --adm-down: #FB7185;
+  --adm-track: rgba(148, 163, 184, 0.16);
+
+  background-color: var(--adm-bg);
+  color: var(--adm-text);
+}
+
+.admin-scope[data-theme='light'] {
+  --adm-bg: #F3F5FA;
+  --adm-panel: #FFFFFF;
+  --adm-card: #FFFFFF;
+  --adm-card-hover: #F1F4F9;
+  --adm-border: rgba(15, 23, 42, 0.10);
+  --adm-border-strong: rgba(15, 23, 42, 0.18);
+  --adm-text: #0F172A;
+  --adm-text-dim: #5A6678;
+  --adm-text-faint: #94A3B8;
+  --adm-accent: #4F46E5;
+  --adm-accent-soft: rgba(99, 102, 241, 0.12);
+  --adm-up: #059669;
+  --adm-down: #E11D48;
+  --adm-track: rgba(15, 23, 42, 0.06);
+}
+
+/* Light-mode cards get a soft shadow instead of relying on dark contrast. */
+.admin-scope[data-theme='light'] .adm-card-shadow {
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+/* Command palette overlay */
+.adm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 16, 0.6);
+  backdrop-filter: blur(2px);
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+}

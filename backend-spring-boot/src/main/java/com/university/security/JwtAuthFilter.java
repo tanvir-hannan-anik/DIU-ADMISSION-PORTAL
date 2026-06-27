@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -33,8 +34,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String email = jwtUtil.extractEmail(token);
                 userRepository.findByEmail(email).ifPresent(user -> {
                     if (Boolean.TRUE.equals(user.getVerified())) {
+                        // Role comes from the DB (not just the token) so a revoked/changed
+                        // role takes effect immediately. Spring expects a ROLE_ prefix.
+                        String role = user.getRole() != null ? user.getRole() : "student";
+                        var authority = new SimpleGrantedAuthority("ROLE_" + role.toUpperCase());
                         UsernamePasswordAuthenticationToken auth =
-                                new UsernamePasswordAuthenticationToken(email, null, List.of());
+                                new UsernamePasswordAuthenticationToken(email, null, List.of(authority));
                         SecurityContextHolder.getContext().setAuthentication(auth);
                     }
                 });

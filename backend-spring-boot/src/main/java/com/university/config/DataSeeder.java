@@ -3,12 +3,16 @@ package com.university.config;
 import com.university.model.entity.*;
 import com.university.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
@@ -16,12 +20,55 @@ public class DataSeeder implements CommandLineRunner {
     private final AdmittedStudentRepository admittedStudentRepository;
     private final NoticeRepository noticeRepository;
     private final JobListingRepository jobListingRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    @Value("${admin.email:}")
+    private String adminEmail;
+
+    @Value("${admin.password:}")
+    private String adminPassword;
 
     @Override
     public void run(String... args) {
+        seedAdminAccount();
         seedAdmittedStudents();
         seedNotices();
         seedJobListings();
+    }
+
+    /**
+     * Seeds (or re-syncs) the single administrator account from environment
+     * config. The password is BCrypt-hashed and never stored in the repo.
+     * If ADMIN_EMAIL / ADMIN_PASSWORD are not set, seeding is skipped.
+     */
+    private void seedAdminAccount() {
+        if (adminEmail == null || adminEmail.isBlank()
+                || adminPassword == null || adminPassword.isBlank()) {
+            log.warn("Admin account not seeded: ADMIN_EMAIL / ADMIN_PASSWORD not configured.");
+            return;
+        }
+
+        String email = adminEmail.trim().toLowerCase();
+        User admin = userRepository.findByEmail(email).orElse(null);
+
+        if (admin == null) {
+            userRepository.save(User.builder()
+                    .email(email)
+                    .name("Administrator")
+                    .password(passwordEncoder.encode(adminPassword))
+                    .role("admin")
+                    .verified(true)
+                    .build());
+            log.info("Admin account seeded for {}", email);
+        } else {
+            // Keep the admin in sync with the configured password/role on each boot.
+            admin.setPassword(passwordEncoder.encode(adminPassword));
+            admin.setRole("admin");
+            admin.setVerified(true);
+            userRepository.save(admin);
+            log.info("Admin account re-synced for {}", email);
+        }
     }
 
     private void seedAdmittedStudents() {
