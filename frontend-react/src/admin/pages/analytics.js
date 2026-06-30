@@ -239,35 +239,119 @@ function FunnelView({ subtitle }) {
 export function FunnelsPage() { return <FunnelView subtitle="Unique visitors reaching each step" />; }
 export function JourneyPage() { return <FunnelView subtitle="How prospective students move toward applying" />; }
 
-// ── Heatmaps & Replays (Clarity — deep link, not embeddable in an iframe) ─────
-function ClarityLink({ title, icon, desc, path }) {
-  return (
-    <div className="p-4 sm:p-6">
-      <div className="rounded-2xl p-10 text-center" style={{ backgroundColor: T.card, border: `1px solid ${T.border}` }}>
-        <span className="material-symbols-outlined text-4xl" style={{ color: T.accent }}>{icon}</span>
-        <p className="text-[16px] font-bold mt-2" style={{ color: T.text }}>{title}</p>
-        <p className="text-[13px] mt-2 max-w-md mx-auto leading-relaxed" style={{ color: T.textDim }}>{desc}</p>
-        <a href={`${CLARITY_BASE}/${path}`} target="_blank" rel="noreferrer"
-           className="inline-flex items-center gap-1.5 mt-4 px-4 h-10 rounded-lg text-[13px] font-bold text-white"
-           style={{ backgroundColor: T.accent }}>
-          <span className="material-symbols-outlined text-[18px]">open_in_new</span>Open in Microsoft Clarity
-        </a>
-        <div className="mt-4 text-left max-w-md mx-auto text-[11px] space-y-1" style={{ color: T.textFaint }}>
-          <p>• Clarity is <b>already installed</b> (project <code>{CLARITY_PROJECT}</code>) and recording live sessions.</p>
-          <p>• Microsoft blocks embedding its dashboards in an iframe, so this button opens your project directly.</p>
-          <p>• Data appears after the site is <b>deployed</b> with the snippet and gets real traffic — first recordings can take up to a couple of hours.</p>
-        </div>
+// ── Heatmaps & Replays (Clarity) ──────────────────────────────────────────────
+// Real Clarity metrics are pulled via the Data Export API and shown natively.
+// The heatmap images / replay videos themselves can't be iframed (Microsoft
+// blocks it), so those open in Clarity via a deep-link button.
+
+const humanize = (k) => k
+  .replace(/([A-Z])/g, ' $1')
+  .replace(/^./, (c) => c.toUpperCase())
+  .replace(/\bCount\b/, '').replace(/\bPercentage\b/, ' %').trim();
+
+const isNum = (v) => v !== null && v !== '' && !isNaN(Number(v));
+
+function ClarityInsights({ days = 3 }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let on = true;
+    analyticsApi.clarity(days).then((r) => { if (on) { setData(r); setLoading(false); } });
+    return () => { on = false; };
+  }, [days]);
+
+  if (loading) return <div className="text-[13px] py-4" style={{ color: T.textFaint }}>Loading Clarity insights…</div>;
+
+  if (!data || data.configured === false) {
+    return (
+      <div className="rounded-2xl p-6" style={{ backgroundColor: T.card, border: `1px dashed ${T.borderStrong}` }}>
+        <p className="text-[14px] font-bold" style={{ color: T.text }}>Show real Clarity metrics here</p>
+        <p className="text-[13px] mt-1.5 leading-relaxed" style={{ color: T.textDim }}>
+          Heatmaps &amp; recordings are already being captured. To display Clarity's numbers (sessions, scroll depth,
+          dead/rage clicks…) inside this page, generate a token in
+          <b> Clarity → Settings → Data Export → Generate new API token</b> and set it as
+          <b> CLARITY_API_TOKEN</b> on the API service.
+        </p>
       </div>
+    );
+  }
+
+  const metrics = Array.isArray(data.metrics) ? data.metrics : [];
+  if (metrics.length === 0) {
+    return <p className="text-[13px] py-2" style={{ color: T.textFaint }}>
+      Connected, but no data returned yet — Clarity needs recent traffic (last {data.days} day(s)).</p>;
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {metrics.map((m, i) => {
+        const info = Array.isArray(m.information) ? m.information : [];
+        const first = info[0] || {};
+        const numericFields = Object.entries(first).filter(([, v]) => isNum(v));
+        return (
+          <div key={m.metricName || i} className="rounded-xl p-4" style={{ backgroundColor: T.card, border: `1px solid ${T.border}` }}>
+            <p className="text-[13px] font-bold mb-2" style={{ color: T.text }}>{humanize(m.metricName || `Metric ${i + 1}`)}</p>
+            {numericFields.length ? (
+              <div className="space-y-1.5">
+                {numericFields.map(([k, v]) => (
+                  <div key={k} className="flex items-center justify-between text-[12px]">
+                    <span style={{ color: T.textDim }}>{humanize(k)}</span>
+                    <span className="font-bold" style={{ color: T.text }}>
+                      {Number(v) % 1 === 0 ? Number(v).toLocaleString() : Number(v).toFixed(1)}
+                    </span>
+                  </div>
+                ))}
+                {info.length > 1 && (
+                  <p className="text-[11px] pt-1" style={{ color: T.textFaint }}>+{info.length - 1} breakdown rows</p>
+                )}
+              </div>
+            ) : <p className="text-[12px]" style={{ color: T.textFaint }}>No values.</p>}
+          </div>
+        );
+      })}
     </div>
   );
 }
+
+function ClarityPage({ title, icon, desc, path }) {
+  return (
+    <div className="p-4 sm:p-6 space-y-5">
+      <div className="rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4"
+           style={{ backgroundColor: T.card, border: `1px solid ${T.border}` }}>
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: T.accentSoft }}>
+          <span className="material-symbols-outlined text-2xl" style={{ color: T.accent }}>{icon}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[16px] font-bold" style={{ color: T.text }}>{title}</p>
+          <p className="text-[13px] mt-0.5" style={{ color: T.textDim }}>{desc}</p>
+        </div>
+        <a href={`${CLARITY_BASE}/${path}`} target="_blank" rel="noreferrer"
+           className="inline-flex items-center gap-1.5 px-4 h-10 rounded-lg text-[13px] font-bold text-white flex-shrink-0"
+           style={{ backgroundColor: T.accent }}>
+          <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+          Open visual {title.toLowerCase()} in Clarity
+        </a>
+      </div>
+
+      <div>
+        <h3 className="text-[14px] font-bold mb-3" style={{ color: T.text }}>Live Clarity Metrics (last 3 days)</h3>
+        <ClarityInsights days={3} />
+      </div>
+
+      <p className="text-[11px]" style={{ color: T.textFaint }}>
+        The heatmap overlay and session videos open in Clarity (Microsoft blocks embedding them); the numbers above are pulled live from Clarity's Data Export API.
+      </p>
+    </div>
+  );
+}
+
 export function HeatmapsPage() {
-  return <ClarityLink title="Heatmaps" icon="whatshot" path="heatmaps"
-    desc="Click, scroll, and area heatmaps for every public page — see exactly where prospective students focus and where they drop off." />;
+  return <ClarityPage title="Heatmaps" icon="whatshot" path="heatmaps"
+    desc="Where prospective students click, scroll, and focus on each page — plus dead clicks and rage clicks." />;
 }
 export function ReplaysPage() {
-  return <ClarityLink title="Session Replays" icon="smart_display" path="recordings"
-    desc="Watch real recordings of visitor sessions on your site to understand friction in the admission journey." />;
+  return <ClarityPage title="Session Replays" icon="smart_display" path="recordings"
+    desc="Real recordings of visitor sessions to understand friction in the admission journey." />;
 }
 
 // ── Real-time ─────────────────────────────────────────────────────────────────

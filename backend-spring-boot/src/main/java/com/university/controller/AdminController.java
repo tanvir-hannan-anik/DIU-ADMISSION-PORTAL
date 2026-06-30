@@ -6,6 +6,7 @@ import com.university.model.entity.User;
 import com.university.repository.AdminAuditLogRepository;
 import com.university.repository.UserRepository;
 import com.university.service.AdmissionService;
+import com.university.service.ClarityService;
 import com.university.service.LeadService;
 import com.university.service.PostHogService;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class AdminController {
     private final LeadService leadService;
     private final AdmissionService admissionService;
     private final PostHogService postHogService;
+    private final ClarityService clarityService;
 
     @Value("${spring.mail.username:}")
     private String mailUsername;
@@ -90,6 +92,7 @@ public class AdminController {
     public ResponseEntity<ResponseWrapper<Object>> integrations() {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("posthog", postHogService.isConfigured());
+        out.put("clarity", clarityService.isConfigured());
         out.put("email", mailUsername != null && !mailUsername.isBlank());
         out.put("aiService", pythonServiceUrl != null && !pythonServiceUrl.isBlank());
         out.put("database", true); // reaching this endpoint means the DB is up

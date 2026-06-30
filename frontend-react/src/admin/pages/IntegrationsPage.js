@@ -23,10 +23,11 @@ export default function IntegrationsPage() {
     },
     {
       key: 'clarity', name: 'Microsoft Clarity', icon: 'whatshot', color: '#FBBF24',
-      desc: 'Heatmaps & session replays.',
-      on: true,
-      onText: 'Snippet installed (project xf02utwxp6). View in the Heatmaps / Replays pages.',
-      where: 'public/index.html',
+      desc: 'Heatmaps, session replays & behavior metrics.',
+      on: status?.clarity,
+      onText: 'Metrics API connected — live Clarity numbers show in Heatmaps/Replays.',
+      offText: 'Snippet is installed & recording (project xf02utwxp6). To show Clarity numbers in-portal, set CLARITY_API_TOKEN (Clarity → Settings → Data Export).',
+      where: 'API env vars',
     },
     {
       key: 'email', name: 'Email (SMTP)', icon: 'mail', color: '#34D399',

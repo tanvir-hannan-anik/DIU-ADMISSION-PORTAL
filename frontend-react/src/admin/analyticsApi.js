@@ -21,4 +21,5 @@ export const analyticsApi = {
   locations: (days) => get('locations', days),
   funnel: (days) => get('funnel', days),
   realtime: () => get('realtime'),
+  clarity: (days = 3) => get('clarity/insights', days),
 };
