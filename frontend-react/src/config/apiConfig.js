@@ -1,13 +1,17 @@
-// Render's fromService property:host returns https://service.onrender.com (no /api suffix).
+// Render's fromService property:host returns ONLY the bare hostname
+// (e.g. "diu-spring-api.onrender.com") — WITHOUT the https:// scheme. Axios treats a
+// scheme-less baseURL as a relative path, so we must prepend https:// here.
 // Spring Boot has context-path=/api, so we append /api when the URL doesn't already include it.
-const rawApiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
+const withScheme = (url) => (/^https?:\/\//i.test(url) ? url : `https://${url}`);
+
+const rawApiUrl = withScheme(process.env.REACT_APP_API_URL || 'http://localhost:8080/api');
 const BASE_URL = rawApiUrl.endsWith('/api') || rawApiUrl.endsWith('/api/')
   ? rawApiUrl.replace(/\/$/, '')
   : `${rawApiUrl}/api`;
 
 const API_CONFIG = {
   BASE_URL,
-  AI_BASE_URL: process.env.REACT_APP_AI_URL || 'http://localhost:5000',
+  AI_BASE_URL: withScheme(process.env.REACT_APP_AI_URL || 'http://localhost:5000'),
   TIMEOUT: parseInt(process.env.REACT_APP_TIMEOUT || '30000', 10),
   DEBUG: process.env.REACT_APP_DEBUG === 'true',
 };

@@ -23,7 +23,10 @@ public class PythonServiceClient {
 
     public AIPromptResponse processAIPrompt(AIPromptRequest request) {
         try {
-            String url = pythonServiceUrl + "/api/v1/ai/process";
+            // Render's fromService property:host gives a bare hostname (no scheme); RestTemplate
+            // needs a full URL, so prepend https:// when the configured value lacks a scheme.
+            String base = pythonServiceUrl.matches("^https?://.*") ? pythonServiceUrl : "https://" + pythonServiceUrl;
+            String url = base + "/api/v1/ai/process";
             long startTime = System.currentTimeMillis();
 
             AIPromptResponse response = restTemplate.postForObject(url, request, AIPromptResponse.class);
