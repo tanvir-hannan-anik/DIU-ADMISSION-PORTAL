@@ -57,6 +57,11 @@ public class AnalyticsController {
         return ResponseEntity.ok(ResponseWrapper.success(wrap("devices", postHog.devices(days))));
     }
 
+    @GetMapping("/locations")
+    public ResponseEntity<ResponseWrapper<Object>> locations(@RequestParam(defaultValue = "7") int days) {
+        return ResponseEntity.ok(ResponseWrapper.success(wrap("locations", postHog.locations(days))));
+    }
+
     @GetMapping("/funnel")
     public ResponseEntity<ResponseWrapper<Object>> funnel(@RequestParam(defaultValue = "7") int days) {
         return ResponseEntity.ok(ResponseWrapper.success(wrap("funnel", postHog.funnel(days))));

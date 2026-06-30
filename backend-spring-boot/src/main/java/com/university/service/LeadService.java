@@ -183,10 +183,19 @@ public class LeadService {
         for (String s : STATUSES) byStatus.put(s, leadRepository.countByStatus(s));
 
         Map<String, Long> bySource = new LinkedHashMap<>();
+        long high = 0, medium = 0, low = 0, scoreSum = 0, scored = 0;
         for (Lead l : leadRepository.findAll()) {
             String src = l.getSource() == null ? "WEBSITE" : l.getSource();
             bySource.merge(src, 1L, Long::sum);
+            int sc = l.getScore() == null ? 0 : l.getScore();
+            scoreSum += sc; scored++;
+            if (sc >= 70) high++; else if (sc >= 40) medium++; else low++;
         }
+        Map<String, Object> quality = new LinkedHashMap<>();
+        quality.put("high", high);
+        quality.put("medium", medium);
+        quality.put("low", low);
+        quality.put("avgScore", scored > 0 ? Math.round(scoreSum * 1.0 / scored) : 0);
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("totalLeads", total);
@@ -194,6 +203,7 @@ public class LeadService {
         out.put("leadsByStatus", byStatus);
         out.put("leadsBySource", bySource);
         out.put("followUpsDue", leadRepository.countByNextFollowUpAtBefore(LocalDateTime.now().plusDays(1)));
+        out.put("leadQuality", quality);
         out.put("recentLeads", leadRepository.findTop5ByOrderByCreatedAtDesc());
         return out;
     }

@@ -18,6 +18,7 @@ export const analyticsApi = {
   pages: (days) => get('pages', days),
   events: (days) => get('events', days),
   devices: (days) => get('devices', days),
+  locations: (days) => get('locations', days),
   funnel: (days) => get('funnel', days),
   realtime: () => get('realtime'),
 };

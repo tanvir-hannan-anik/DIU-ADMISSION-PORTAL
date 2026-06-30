@@ -85,6 +85,16 @@ public class PostHogService {
 
     private long asLong(Object v) { return v instanceof Number ? ((Number) v).longValue() : 0; }
 
+    private double firstDouble(List<List<Object>> rows) {
+        if (rows.isEmpty() || rows.get(0).isEmpty()) return 0;
+        Object v = rows.get(0).get(0);
+        return v instanceof Number ? ((Number) v).doubleValue() : 0;
+    }
+
+    private String asStr(Object v) { return v == null ? "" : String.valueOf(v); }
+
+    private int round1(double d) { return (int) Math.round(d); }
+
     /** Headline KPIs for the dashboard over the last N days. */
     public Map<String, Object> overview(int days) {
         Map<String, Object> out = new LinkedHashMap<>();
@@ -96,6 +106,39 @@ public class PostHogService {
                 "SELECT count(DISTINCT properties.$session_id) FROM events WHERE timestamp > now() - INTERVAL " + days + " DAY")));
         out.put("leadEvents", firstLong(query(
                 "SELECT count() FROM events WHERE event = 'lead_captured' AND timestamp > now() - INTERVAL " + days + " DAY")));
+
+        // Avg session duration (seconds): span of each session's events.
+        out.put("avgSessionSeconds", Math.round(firstDouble(query(
+                "SELECT avg(dur) FROM (SELECT properties.$session_id AS sid, " +
+                "dateDiff('second', min(timestamp), max(timestamp)) AS dur FROM events " +
+                "WHERE timestamp > now() - INTERVAL " + days + " DAY AND properties.$session_id != '' GROUP BY sid)"))));
+
+        // Bounce rate (%): share of sessions with a single pageview.
+        out.put("bounceRate", round1(firstDouble(query(
+                "SELECT 100.0 * sum(if(pv = 1, 1, 0)) / count() FROM (" +
+                "SELECT properties.$session_id AS sid, count() AS pv FROM events " +
+                "WHERE event = '$pageview' AND timestamp > now() - INTERVAL " + days + " DAY " +
+                "AND properties.$session_id != '' GROUP BY sid)"))));
+
+        out.put("dailySeries", dailyPageviews(days));
+        return out;
+    }
+
+    /** Daily pageview series for sparklines / area charts. */
+    public List<Map<String, Object>> dailyPageviews(int days) {
+        List<List<Object>> rows = query(
+                "SELECT toDate(timestamp) AS d, count() AS c FROM events " +
+                "WHERE event = '$pageview' AND timestamp > now() - INTERVAL " + days + " DAY " +
+                "GROUP BY d ORDER BY d");
+        List<Map<String, Object>> out = new ArrayList<>();
+        int i = 0;
+        for (List<Object> r : rows) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("x", i++);
+            m.put("label", asStr(r.get(0)));
+            m.put("y", asLong(r.get(1)));
+            out.add(m);
+        }
         return out;
     }
 
@@ -105,12 +148,13 @@ public class PostHogService {
                 "SELECT count(DISTINCT person_id) FROM events WHERE timestamp > now() - INTERVAL 30 MINUTE"));
     }
 
-    /** Traffic grouped by referring domain. */
-    public List<Map<String, Object>> trafficSources(int days) {
+    /** Top visitor locations by country. */
+    public List<Map<String, Object>> locations(int days) {
         List<List<Object>> rows = query(
-                "SELECT coalesce(nullIf(properties.$referring_domain, ''), 'direct') AS source, count() AS c " +
-                "FROM events WHERE event = '$pageview' AND timestamp > now() - INTERVAL " + days + " DAY " +
-                "GROUP BY source ORDER BY c DESC LIMIT 8");
+                "SELECT coalesce(nullIf(properties.$geoip_country_name, ''), 'Unknown') AS country, " +
+                "count(DISTINCT person_id) AS c FROM events " +
+                "WHERE timestamp > now() - INTERVAL " + days + " DAY " +
+                "GROUP BY country ORDER BY c DESC LIMIT 12");
         List<Map<String, Object>> out = new ArrayList<>();
         for (List<Object> r : rows) {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -119,6 +163,51 @@ public class PostHogService {
             out.add(m);
         }
         return out;
+    }
+
+    // Canonical channel order for the traffic donut.
+    private static final List<String> CHANNELS = List.of(
+            "Facebook", "Google", "Instagram", "Twitter (X)", "YouTube", "LinkedIn", "Direct", "Other");
+
+    /**
+     * Traffic grouped into named marketing channels. Uses utm_source first (most
+     * reliable — set it on your ad links), then the referring domain, then Direct.
+     */
+    public List<Map<String, Object>> trafficSources(int days) {
+        List<List<Object>> rows = query(
+                "SELECT coalesce(nullIf(lower(properties.utm_source), ''), " +
+                "nullIf(lower(properties.$referring_domain), ''), 'direct') AS src, count() AS c " +
+                "FROM events WHERE event = '$pageview' AND timestamp > now() - INTERVAL " + days + " DAY " +
+                "GROUP BY src ORDER BY c DESC LIMIT 100");
+
+        Map<String, Long> buckets = new LinkedHashMap<>();
+        for (String ch : CHANNELS) buckets.put(ch, 0L);
+        for (List<Object> r : rows) {
+            buckets.merge(channelOf(asStr(r.get(0))), asLong(r.get(1)), Long::sum);
+        }
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map.Entry<String, Long> e : buckets.entrySet()) {
+            if (e.getValue() == 0) continue; // only show channels that have traffic
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", e.getKey());
+            m.put("value", e.getValue());
+            out.add(m);
+        }
+        return out;
+    }
+
+    /** Map a utm_source / referrer domain to one of the named channels. */
+    private String channelOf(String raw) {
+        String s = raw == null ? "" : raw.toLowerCase();
+        if (s.isBlank() || s.equals("direct") || s.equals("$direct")) return "Direct";
+        if (s.contains("facebook") || s.equals("fb") || s.contains("fb.com") || s.contains("l.facebook")) return "Facebook";
+        if (s.contains("google") || s.contains("googleads") || s.contains("doubleclick")) return "Google";
+        if (s.contains("instagram") || s.equals("ig") || s.contains("l.instagram")) return "Instagram";
+        if (s.contains("twitter") || s.contains("t.co") || s.equals("x") || s.contains("x.com")) return "Twitter (X)";
+        if (s.contains("youtube") || s.contains("youtu.be")) return "YouTube";
+        if (s.contains("linkedin") || s.contains("lnkd")) return "LinkedIn";
+        return "Other";
     }
 
     /** Top pages by views. */

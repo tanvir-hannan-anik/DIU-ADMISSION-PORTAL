@@ -50,21 +50,29 @@ const withPct = (rows, key = 'value') => {
 };
 const fmt = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n ?? 0}`);
 
-// ── Visitors ──────────────────────────────────────────────────────────────────
+const fmtDur = (s) => {
+  if (!s) return '0s';
+  const m = Math.floor(s / 60), sec = Math.round(s % 60);
+  return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+};
+
+// ── Visitors (visitors, sessions, duration, bounce, devices, locations) ───────
 export function VisitorsPage() {
   const [days, setDays] = useState(7);
   const [ov, setOv] = useState(null);
   const [devices, setDevices] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let on = true;
     setLoading(true);
-    Promise.all([analyticsApi.overview(days), analyticsApi.devices(days)]).then(([o, d]) => {
-      if (!on) return;
-      setOv(o); setDevices(withPct(d.devices || []));
-      setLoading(false);
-    });
+    Promise.all([analyticsApi.overview(days), analyticsApi.devices(days), analyticsApi.locations(days)])
+      .then(([o, d, l]) => {
+        if (!on) return;
+        setOv(o); setDevices(withPct(d.devices || [])); setLocations(withPct(l.locations || []));
+        setLoading(false);
+      });
     return () => { on = false; };
   }, [days]);
 
@@ -75,26 +83,44 @@ export function VisitorsPage() {
     { label: 'Unique Visitors', value: fmt(ov?.uniqueVisitors), icon: 'group', c: '#A78BFA' },
     { label: 'Sessions', value: fmt(ov?.sessions), icon: 'timeline', c: '#34D399' },
     { label: 'Active Now', value: fmt(ov?.activeNow), icon: 'sensors', c: '#22D3EE' },
+    { label: 'Avg Session', value: fmtDur(ov?.avgSessionSeconds), icon: 'timer', c: '#FBBF24' },
+    { label: 'Bounce Rate', value: `${ov?.bounceRate ?? 0}%`, icon: 'call_missed_outgoing', c: '#FB7185' },
   ];
 
   return (
     <div className="p-4 sm:p-6">
       <RangeBar days={days} setDays={setDays} loading={loading} />
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4 mb-5">
         {cards.map((c) => (
           <div key={c.label} className="rounded-2xl p-4" style={{ backgroundColor: T.card, border: `1px solid ${T.border}` }}>
             <div className="flex items-center gap-2 mb-2">
               <span className="material-symbols-outlined text-[18px]" style={{ color: c.c }}>{c.icon}</span>
               <p className="text-[12px] font-medium" style={{ color: T.textDim }}>{c.label}</p>
             </div>
-            <p className="text-[26px] font-extrabold" style={{ color: T.text }}>{c.value}</p>
+            <p className="text-[22px] font-extrabold" style={{ color: T.text }}>{c.value}</p>
           </div>
         ))}
       </div>
-      <Panel title="Device Breakdown" subtitle="Unique visitors by device type">
-        {devices.length ? <DonutWithLegend data={devices} centerValue={fmt(ov?.uniqueVisitors)} centerLabel="Visitors" />
-          : <p className="text-[13px]" style={{ color: T.textFaint }}>No device data for this range yet.</p>}
-      </Panel>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Panel title="Device Breakdown" subtitle="Unique visitors by device type">
+          {devices.length ? <DonutWithLegend data={devices} centerValue={fmt(ov?.uniqueVisitors)} centerLabel="Visitors" />
+            : <p className="text-[13px]" style={{ color: T.textFaint }}>No device data for this range yet.</p>}
+        </Panel>
+        <Panel title="Visitor Locations" subtitle="Top countries by visitors">
+          {locations.length ? (
+            <ul className="space-y-2.5">
+              {locations.map((l, i) => (
+                <li key={l.name} className="flex items-center gap-2.5 text-[13px] min-w-0">
+                  <span className="w-5 text-right font-bold flex-shrink-0" style={{ color: T.textFaint }}>{i + 1}</span>
+                  <span className="flex-1 truncate" style={{ color: T.text }}>{l.name}</span>
+                  <span className="font-semibold flex-shrink-0" style={{ color: T.text }}>{fmt(l.value)}</span>
+                  <span className="w-11 text-right text-[12px] flex-shrink-0" style={{ color: T.textFaint }}>{l.pct}%</span>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-[13px]" style={{ color: T.textFaint }}>No location data yet (PostHog GeoIP fills this automatically).</p>}
+        </Panel>
+      </div>
     </div>
   );
 }
@@ -226,9 +252,11 @@ function ClarityLink({ title, icon, desc, path }) {
            style={{ backgroundColor: T.accent }}>
           <span className="material-symbols-outlined text-[18px]">open_in_new</span>Open in Microsoft Clarity
         </a>
-        <p className="text-[11px] mt-3" style={{ color: T.textFaint }}>
-          Clarity dashboards can't be embedded directly (security headers), so this opens your live project.
-        </p>
+        <div className="mt-4 text-left max-w-md mx-auto text-[11px] space-y-1" style={{ color: T.textFaint }}>
+          <p>• Clarity is <b>already installed</b> (project <code>{CLARITY_PROJECT}</code>) and recording live sessions.</p>
+          <p>• Microsoft blocks embedding its dashboards in an iframe, so this button opens your project directly.</p>
+          <p>• Data appears after the site is <b>deployed</b> with the snippet and gets real traffic — first recordings can take up to a couple of hours.</p>
+        </div>
       </div>
     </div>
   );
@@ -238,7 +266,7 @@ export function HeatmapsPage() {
     desc="Click, scroll, and area heatmaps for every public page — see exactly where prospective students focus and where they drop off." />;
 }
 export function ReplaysPage() {
-  return <ClarityLink title="Session Replays" icon="smart_display" path="impressions"
+  return <ClarityLink title="Session Replays" icon="smart_display" path="recordings"
     desc="Watch real recordings of visitor sessions on your site to understand friction in the admission journey." />;
 }
 

@@ -3,17 +3,20 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { navGroupsForRole, ROLE_LABELS } from './adminNav';
 import { adminAuth } from './adminAuth';
+import adminApi from './adminApi';
 import { useTheme } from './themeContext';
 import { T } from './theme';
 import Dropdown, { MenuItem } from './components/Dropdown';
 import CommandPalette from './components/CommandPalette';
 
-const NOTIFICATIONS = [
-  { id: 1, icon: 'person_add', title: 'New lead captured', sub: 'anik.hasan@gmail.com', time: '2m' },
-  { id: 2, icon: 'description', title: 'Application submitted', sub: 'CSE · Fall 2026', time: '8m' },
-  { id: 3, icon: 'forum', title: 'Chatbot unanswered question', sub: '“Is there a waiver for SSC?”', time: '20m' },
-  { id: 4, icon: 'trending_up', title: 'Traffic spike detected', sub: '+38% from Facebook', time: '1h' },
-];
+const ago = (d) => {
+  if (!d) return '';
+  const s = Math.floor((Date.now() - new Date(d).getTime()) / 1000);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  return `${Math.floor(s / 86400)}d`;
+};
 
 function Sidebar({ onNavigate }) {
   const navigate = useNavigate();
@@ -81,10 +84,25 @@ function Sidebar({ onNavigate }) {
 export default function AdminLayout({ title, subtitle, children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [unread, setUnread] = useState(NOTIFICATIONS.length);
+  const [notifications, setNotifications] = useState([]);
+  const [unread, setUnread] = useState(0);
   const navigate = useNavigate();
   const { mode, toggle } = useTheme();
   const user = adminAuth.getUser();
+
+  // Real notifications: most recent captured leads from the CRM.
+  useEffect(() => {
+    adminApi.get('/v1/admin/stats').then((r) => {
+      const leads = r.data.data?.recentLeads || [];
+      const items = leads.map((l) => ({
+        id: l.id, icon: 'person_add', title: 'New lead captured',
+        sub: `${l.email || 'unknown'}${l.interestedProgram ? ' · ' + l.interestedProgram : ''}`,
+        time: ago(l.createdAt),
+      }));
+      setNotifications(items);
+      setUnread(items.length);
+    }).catch(() => {});
+  }, []);
 
   // Global ⌘K / Ctrl+K to open the command palette.
   useEffect(() => {
@@ -174,7 +192,9 @@ export default function AdminLayout({ title, subtitle, children }) {
                             onClick={() => { setUnread(0); toast.success('All notifications marked as read'); }}>Mark all read</button>
                   </div>
                   <div className="max-h-72 overflow-y-auto py-1">
-                    {NOTIFICATIONS.map((n) => (
+                    {notifications.length === 0 ? (
+                      <p className="text-[12px] text-center py-6" style={{ color: T.textFaint }}>No new notifications.</p>
+                    ) : notifications.map((n) => (
                       <div key={n.id} className="flex gap-2.5 px-3 py-2.5 hover:bg-white/5">
                         <span className="material-symbols-outlined text-[19px] flex-shrink-0" style={{ color: T.accent }}>{n.icon}</span>
                         <div className="min-w-0 flex-1">
@@ -185,7 +205,7 @@ export default function AdminLayout({ title, subtitle, children }) {
                       </div>
                     ))}
                   </div>
-                  <button onClick={() => { close(); navigate('/admin/events'); }} className="w-full py-2.5 text-[12px] font-semibold" style={{ color: T.accent, borderTop: `1px solid ${T.border}` }}>View all activity</button>
+                  <button onClick={() => { close(); navigate('/admin/leads'); }} className="w-full py-2.5 text-[12px] font-semibold" style={{ color: T.accent, borderTop: `1px solid ${T.border}` }}>View all leads</button>
                 </div>
               )}
             </Dropdown>

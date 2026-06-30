@@ -54,7 +54,7 @@ export function SelectPill({ value = 'This Week', options = ['Today', 'This Week
 }
 
 // ── KPI card with sparkline ───────────────────────────────────────────────────
-export function KpiCard({ label, value, delta, up, color, data, live }) {
+export function KpiCard({ label, value, delta, up, color, data, live, subtitle, hideDelta }) {
   const gid = `spark-${label.replace(/\W/g, '')}`;
   return (
     <div className="rounded-2xl p-4 min-w-0 adm-card-shadow" style={{ backgroundColor: T.card, border: `1px solid ${T.border}` }}>
@@ -64,31 +64,45 @@ export function KpiCard({ label, value, delta, up, color, data, live }) {
       </p>
       <div className="flex flex-wrap items-end gap-x-2 gap-y-0.5">
         <span className="text-[24px] font-extrabold leading-none" style={{ color: T.text }}>{value}</span>
-        <span className="flex items-center text-[12px] font-bold mb-0.5" style={{ color: up ? T.up : T.down }}>
-          <span className="material-symbols-outlined text-[15px]">{up ? 'trending_up' : 'trending_down'}</span>
-          {Math.abs(delta)}%
-        </span>
+        {!hideDelta && (
+          <span className="flex items-center text-[12px] font-bold mb-0.5" style={{ color: up ? T.up : T.down }}>
+            <span className="material-symbols-outlined text-[15px]">{up ? 'trending_up' : 'trending_down'}</span>
+            {Math.abs(delta)}%
+          </span>
+        )}
       </div>
-      <p className="text-[11px] mt-1 truncate" style={{ color: T.textFaint }}>vs last 7 days</p>
-      <div className="h-9 mt-2 -mx-1">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 4, right: 2, left: 2, bottom: 0 }}>
-            <defs>
-              <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-                <stop offset="100%" stopColor={color} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <Area type="monotone" dataKey="y" stroke={color} strokeWidth={2} fill={`url(#${gid})`} dot={false} isAnimationActive={false} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+      <p className="text-[11px] mt-1 truncate" style={{ color: T.textFaint }}>{subtitle || 'last 7 days'}</p>
+      {data && data.length > 0 && (
+        <div className="h-9 mt-2 -mx-1">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 4, right: 2, left: 2, bottom: 0 }}>
+              <defs>
+                <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+                  <stop offset="100%" stopColor={color} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area type="monotone" dataKey="y" stroke={color} strokeWidth={2} fill={`url(#${gid})`} dot={false} isAnimationActive={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Donut + legend (responsive, no overflow) ──────────────────────────────────
+function NoData({ label = 'No data yet' }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-8 text-center">
+      <span className="material-symbols-outlined text-[28px]" style={{ color: T.textFaint }}>bar_chart_4_bars</span>
+      <p className="text-[12px] mt-1" style={{ color: T.textFaint }}>{label}</p>
+    </div>
+  );
+}
+
 export function DonutWithLegend({ data, centerValue, centerLabel }) {
+  if (!data || data.length === 0) return <NoData />;
   return (
     <div className="flex flex-col sm:flex-row items-center gap-5">
       <div className="relative w-40 h-40 flex-shrink-0">
@@ -164,6 +178,7 @@ export function DeviceBars({ items }) {
 
 // ── Top pages bar list ────────────────────────────────────────────────────────
 export function TopPagesList({ pages }) {
+  if (!pages || pages.length === 0) return <NoData label="No page views yet" />;
   const max = Math.max(...pages.map((p) => p.views));
   return (
     <div className="space-y-2.5">
@@ -183,7 +198,8 @@ export function TopPagesList({ pages }) {
 
 // ── User-journey funnel (horizontal — robust to long labels) ──────────────────
 export function FunnelChart({ stages }) {
-  const max = stages[0].value;
+  if (!stages || stages.length === 0) return <NoData label="No funnel data yet" />;
+  const max = stages[0].value || 1;
   return (
     <div className="space-y-2.5">
       {stages.map((s, i) => {
@@ -249,7 +265,12 @@ export function ActivityFeed({ items, onViewAll }) {
         <p className="text-[12px] mt-0.5" style={{ color: T.textDim }}>Real-time user activities</p>
       </div>
       <div className="flex-1 overflow-y-auto px-5 space-y-4 min-h-0">
-        {items.map((a) => (
+        {(!items || items.length === 0) && (
+          <p className="text-[12px] text-center py-6" style={{ color: T.textFaint }}>
+            No recent activity yet. Captured leads and applications appear here.
+          </p>
+        )}
+        {(items || []).map((a) => (
           <div key={a.id} className="flex gap-3 min-w-0">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${a.tint}22` }}>
               <span className="material-symbols-outlined text-[18px]" style={{ color: a.tint }}>{a.icon}</span>
