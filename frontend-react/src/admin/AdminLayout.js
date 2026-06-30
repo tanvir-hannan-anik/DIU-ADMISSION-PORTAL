@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { NAV_GROUPS } from './adminNav';
+import { navGroupsForRole, ROLE_LABELS } from './adminNav';
 import { adminAuth } from './adminAuth';
 import { useTheme } from './themeContext';
 import { T } from './theme';
@@ -18,6 +18,8 @@ const NOTIFICATIONS = [
 function Sidebar({ onNavigate }) {
   const navigate = useNavigate();
   const handleLogout = () => { adminAuth.logout(); navigate('/admin', { replace: true }); };
+  const role = (adminAuth.getUser()?.role || 'admin').toLowerCase();
+  const groups = navGroupsForRole(role);
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: T.panel }}>
@@ -33,7 +35,7 @@ function Sidebar({ onNavigate }) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5 min-h-0">
-        {NAV_GROUPS.map((group) => (
+        {groups.map((group) => (
           <div key={group.title}>
             <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: T.textFaint }}>{group.title}</p>
             <div className="space-y-0.5">
@@ -197,7 +199,7 @@ export default function AdminLayout({ title, subtitle, children }) {
                 </div>
                 <div className="hidden sm:block text-left">
                   <p className="text-[13px] font-bold leading-none truncate max-w-[120px]" style={{ color: T.text }}>{user?.name || 'Admin'}</p>
-                  <p className="text-[11px]" style={{ color: T.textDim }}>Super Admin</p>
+                  <p className="text-[11px]" style={{ color: T.textDim }}>{ROLE_LABELS[(user?.role || 'admin').toLowerCase()] || 'Staff'}</p>
                 </div>
               </button>
             )}>

@@ -58,6 +58,10 @@ public class Lead {
     @Column(name = "assigned_counselor_id")
     private Long assignedCounselorId;
 
+    /** When the next follow-up with this lead is due (drives the Follow Ups page). */
+    @Column(name = "next_follow_up_at")
+    private LocalDateTime nextFollowUpAt;
+
     @Column(name = "message", columnDefinition = "TEXT")
     private String message;
 

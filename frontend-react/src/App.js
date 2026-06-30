@@ -1,8 +1,10 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useAuth } from './hooks/useAuth';
+import { captureUtmParams } from './utils/tracking';
+import RequestInfoWidget from './components/common/RequestInfoWidget';
 
 // Pages
 import { Dashboard }              from './components/dashboard/Dashboard';
@@ -45,6 +47,10 @@ function GuestRoute({ children }) {
 }
 
 function App() {
+  // Persist UTM params once on first load so campaign attribution survives
+  // navigation before a lead is captured.
+  useEffect(() => { captureUtmParams(); }, []);
+
   return (
     <Router>
       <div className="min-h-screen bg-background">
@@ -92,6 +98,9 @@ function App() {
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>
+
+      {/* Global lead-capture CTA (auto-hidden on /admin + auth pages) */}
+      <RequestInfoWidget />
 
       <ToastContainer
         position="bottom-right"

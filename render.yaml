@@ -77,6 +77,15 @@ services:
         sync: false
       - key: MAIL_PASSWORD
         sync: false
+      # ── PostHog analytics (admin dashboard reads visitor data back) ────────
+      # Secret Personal API Key (phx_...) — NOT the public phc_ site key.
+      # PostHog → Settings → Personal API Keys. Project ID is the numeric id.
+      - key: POSTHOG_API_KEY
+        sync: false
+      - key: POSTHOG_PROJECT_ID
+        sync: false
+      - key: POSTHOG_HOST
+        value: https://us.posthog.com
 
   # ── React Frontend ───────────────────────────────────────────────────────────
   - type: web

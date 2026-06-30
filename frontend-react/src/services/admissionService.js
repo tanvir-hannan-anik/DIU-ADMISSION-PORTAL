@@ -1,5 +1,6 @@
 import api from './api';
 import { API_ENDPOINTS } from '../config/apiConfig';
+import { trackEvent, identifyLead } from '../utils/tracking';
 
 export const admissionService = {
   getApplications: async () => {
@@ -35,6 +36,9 @@ export const admissionService = {
   submitApplication: async (formData) => {
     try {
       const response = await api.post(API_ENDPOINTS.ADMISSION.SUBMIT_APPLICATION, formData);
+      // Funnel: final conversion step (mirrors the CRM lead the backend creates).
+      if (formData?.email) identifyLead(formData.email, { name: formData.fullName });
+      trackEvent('application_submitted', { program: formData?.program || 'unspecified' });
       return {
         success: true,
         data: response.data?.data || response.data,

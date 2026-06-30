@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { noticeService } from '../../services/noticeService';
+import { trackEvent } from '../../utils/tracking';
 
 const TYPE_STYLES = {
   URGENT:  { bar: 'bg-red-500',    badge: 'bg-red-100 text-red-700',     icon: '🚨' },
@@ -244,7 +245,7 @@ export const Navigation = () => {
         {/* Desktop action buttons */}
         <div className="hidden md:flex items-center gap-3">
           <button
-            onClick={() => navigate('/pre-register')}
+            onClick={() => { trackEvent('apply_now_clicked', { location: 'nav' }); navigate('/pre-register'); }}
             className="px-5 py-2 bg-[#0c1282] text-white rounded-lg font-bold hover:bg-[#0c1282]/85 active:scale-95 transition-all text-sm"
           >
             Apply Now

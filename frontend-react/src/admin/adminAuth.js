@@ -10,6 +10,9 @@ const ERROR_MESSAGES = {
   NOT_ADMIN: 'This account does not have admin access.',
 };
 
+// Roles allowed into the admin portal (must mirror the backend PORTAL_ROLES).
+export const PORTAL_ROLES = ['admin', 'admission_officer', 'marketing', 'faculty_admin'];
+
 export const adminAuth = {
   async login(email, password) {
     let res;
@@ -33,8 +36,8 @@ export const adminAuth = {
 
     const { token, user } = res.data.data || {};
     const role = (user?.role || '').toLowerCase();
-    if (!token || role !== 'admin') {
-      // Not an admin — do not establish an admin session.
+    if (!token || !PORTAL_ROLES.includes(role)) {
+      // Not a portal staff account — do not establish an admin session.
       return { success: false, error: ERROR_MESSAGES.NOT_ADMIN };
     }
 

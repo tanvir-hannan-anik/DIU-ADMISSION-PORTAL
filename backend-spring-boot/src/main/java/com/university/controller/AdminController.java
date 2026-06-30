@@ -7,7 +7,9 @@ import com.university.repository.AdminAuditLogRepository;
 import com.university.repository.UserRepository;
 import com.university.service.AdmissionService;
 import com.university.service.LeadService;
+import com.university.service.PostHogService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +17,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -31,6 +34,13 @@ public class AdminController {
     private final AdminAuditLogRepository auditLogRepository;
     private final LeadService leadService;
     private final AdmissionService admissionService;
+    private final PostHogService postHogService;
+
+    @Value("${spring.mail.username:}")
+    private String mailUsername;
+
+    @Value("${python.service.url:}")
+    private String pythonServiceUrl;
 
     /** Returns the current admin's identity — used by the frontend to confirm access. */
     @GetMapping("/me")
@@ -72,6 +82,17 @@ public class AdminController {
         out.put("pendingApplications", appStats.get("pending"));
         out.put("applicationConversionRate", appStats.get("conversionRate"));
         out.put("departmentBreakdown", appStats.get("departmentBreakdown"));
+        return ResponseEntity.ok(ResponseWrapper.success(out));
+    }
+
+    /** Connection status of each external integration (Settings → Integrations). */
+    @GetMapping("/integrations")
+    public ResponseEntity<ResponseWrapper<Object>> integrations() {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("posthog", postHogService.isConfigured());
+        out.put("email", mailUsername != null && !mailUsername.isBlank());
+        out.put("aiService", pythonServiceUrl != null && !pythonServiceUrl.isBlank());
+        out.put("database", true); // reaching this endpoint means the DB is up
         return ResponseEntity.ok(ResponseWrapper.success(out));
     }
 

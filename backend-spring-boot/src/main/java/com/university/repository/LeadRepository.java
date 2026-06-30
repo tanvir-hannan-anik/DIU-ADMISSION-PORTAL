@@ -22,4 +22,9 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
     long countByCreatedAtAfter(LocalDateTime since);
 
     Optional<Lead> findFirstByEmailOrderByCreatedAtDesc(String email);
+
+    // Follow Ups: leads with a scheduled follow-up, soonest first.
+    List<Lead> findByNextFollowUpAtIsNotNullOrderByNextFollowUpAtAsc();
+
+    long countByNextFollowUpAtBefore(LocalDateTime when);
 }

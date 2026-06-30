@@ -61,6 +61,11 @@ export default function LeadsPage() {
     try { await adminApi.post(`/v1/admin/leads/${id}/notes`, { detail: note.trim() }); setNote(''); refreshDetail(id); }
     catch { toast.error('Note failed'); }
   };
+  const scheduleFollowUp = async (id, dueAt) => {
+    if (!dueAt) { toast.error('Pick a date & time'); return; }
+    try { await adminApi.post(`/v1/admin/leads/${id}/followup`, { dueAt }); toast.success('Follow-up scheduled'); load(); refreshDetail(id); }
+    catch { toast.error('Could not schedule'); }
+  };
   const counselorName = (cid) => counselors.find((c) => c.id === cid)?.name || (cid ? `#${cid}` : '—');
 
   return (
@@ -128,14 +133,16 @@ export default function LeadsPage() {
           note={note} setNote={setNote}
           onClose={() => setSelected(null)}
           onStatus={changeStatus} onAssign={assign} onAddNote={addNote}
+          onScheduleFollowUp={scheduleFollowUp}
         />
       )}
     </div>
   );
 }
 
-function LeadDrawer({ detail, counselors, counselorName, note, setNote, onClose, onStatus, onAssign, onAddNote }) {
+function LeadDrawer({ detail, counselors, counselorName, note, setNote, onClose, onStatus, onAssign, onAddNote, onScheduleFollowUp }) {
   const { lead, activities } = detail;
+  const [followUp, setFollowUp] = useState('');
   const field = (label, value) => (
     <div>
       <p className="text-[11px] uppercase tracking-wider font-bold" style={{ color: T.textFaint }}>{label}</p>
@@ -189,6 +196,23 @@ function LeadDrawer({ detail, counselors, counselorName, note, setNote, onClose,
             {counselors.length === 0 && (
               <p className="text-[11px] mt-1" style={{ color: T.textFaint }}>No counselors yet — add them in Settings → Users &amp; Roles.</p>
             )}
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-wider font-bold mb-1.5" style={{ color: T.textFaint }}>Schedule follow-up</p>
+            {lead.nextFollowUpAt && (
+              <p className="text-[11px] mb-1.5" style={{ color: T.accent }}>
+                Next: {new Date(lead.nextFollowUpAt).toLocaleString()}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <input type="datetime-local" value={followUp} onChange={(e) => setFollowUp(e.target.value)}
+                     className="flex-1 px-3 py-2 rounded-lg text-[13px] outline-none"
+                     style={{ backgroundColor: T.bg, color: T.text, border: `1px solid ${T.border}` }} />
+              <button onClick={() => onScheduleFollowUp(lead.id, followUp)}
+                      className="px-3 rounded-lg text-[13px] font-semibold text-white" style={{ backgroundColor: T.accent }}>
+                Set
+              </button>
+            </div>
           </div>
         </div>
 

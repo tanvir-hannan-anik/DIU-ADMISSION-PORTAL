@@ -8,6 +8,15 @@ import AdminDashboard from './pages/AdminDashboard';
 import AuditLogsPage from './pages/AuditLogsPage';
 import LeadsPage from './pages/LeadsPage';
 import ApplicationsPage from './pages/ApplicationsPage';
+import FollowUpsPage from './pages/FollowUpsPage';
+import PipelinePage from './pages/PipelinePage';
+import {
+  VisitorsPage, TrafficPage, PagesPage, EventsPage,
+  FunnelsPage, JourneyPage, HeatmapsPage, ReplaysPage, RealtimePage,
+} from './pages/analytics';
+import UsersRolesPage from './pages/UsersRolesPage';
+import IntegrationsPage from './pages/IntegrationsPage';
+import ChatAnalyticsPage from './pages/ChatAnalyticsPage';
 import Placeholder from './pages/Placeholder';
 import { NAV_GROUPS, PLACEHOLDER_ROUTES } from './adminNav';
 import { T } from './theme';
@@ -48,8 +57,22 @@ export default function AdminApp() {
         <Routes>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="realtime" element={<RealtimePage />} />
+          <Route path="visitors" element={<VisitorsPage />} />
+          <Route path="traffic" element={<TrafficPage />} />
+          <Route path="pages" element={<PagesPage />} />
+          <Route path="events" element={<EventsPage />} />
+          <Route path="funnels" element={<FunnelsPage />} />
+          <Route path="journey" element={<JourneyPage />} />
+          <Route path="heatmaps" element={<HeatmapsPage />} />
+          <Route path="replays" element={<ReplaysPage />} />
           <Route path="leads" element={<LeadsPage />} />
           <Route path="applications" element={<ApplicationsPage />} />
+          <Route path="followups" element={<FollowUpsPage />} />
+          <Route path="pipeline" element={<PipelinePage />} />
+          <Route path="chat" element={<ChatAnalyticsPage />} />
+          <Route path="users" element={<UsersRolesPage />} />
+          <Route path="integrations" element={<IntegrationsPage />} />
           <Route path="audit" element={<AuditLogsPage />} />
           {PLACEHOLDER_ROUTES.map((n) => (
             <Route key={n.path} path={n.path}

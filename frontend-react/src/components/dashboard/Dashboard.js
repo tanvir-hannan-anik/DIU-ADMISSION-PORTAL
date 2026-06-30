@@ -6,6 +6,7 @@ import { useAI } from '../../hooks/useAI';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'react-toastify';
 import { admissionService } from '../../services/admissionService';
+import { trackEvent } from '../../utils/tracking';
 
 // ── Form Assistant Field Definitions ─────────────────────────────────────────
 
@@ -101,7 +102,7 @@ const HeroSection = () => {
 
           <div className="flex flex-wrap gap-4">
             <button
-              onClick={() => navigate('/pre-register')}
+              onClick={() => { trackEvent('apply_now_clicked', { location: 'dashboard_hero' }); navigate('/pre-register'); }}
               className="px-8 py-4 bg-primary-fixed text-on-primary-fixed rounded-xl font-bold flex items-center gap-2 hover:bg-primary-fixed-dim transition-all shadow-lg shadow-[#0c1282]/40"
             >
               Start Application

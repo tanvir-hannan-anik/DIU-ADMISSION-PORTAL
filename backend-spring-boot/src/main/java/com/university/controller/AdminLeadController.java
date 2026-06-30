@@ -84,6 +84,41 @@ public class AdminLeadController {
         }
     }
 
+    // ── Follow-ups ──────────────────────────────────────────────────────────────
+    @GetMapping("/followups")
+    public ResponseEntity<ResponseWrapper<Object>> followUps() {
+        return ResponseEntity.ok(ResponseWrapper.success(leadService.listFollowUps()));
+    }
+
+    @PostMapping("/leads/{id}/followup")
+    public ResponseEntity<ResponseWrapper<Object>> scheduleFollowUp(
+            @PathVariable Long id, @RequestBody Map<String, String> body, Authentication auth) {
+        try {
+            return ResponseEntity.ok(ResponseWrapper.success(
+                    leadService.scheduleFollowUp(id, body.get("dueAt"), body.get("note"), actor(auth))));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ResponseWrapper.error(e.getMessage(), e.getMessage()));
+        }
+    }
+
+    @PostMapping("/leads/{id}/followup/complete")
+    public ResponseEntity<ResponseWrapper<Object>> completeFollowUp(
+            @PathVariable Long id, @RequestBody(required = false) Map<String, String> body, Authentication auth) {
+        try {
+            String outcome = body != null ? body.get("outcome") : null;
+            return ResponseEntity.ok(ResponseWrapper.success(
+                    leadService.completeFollowUp(id, outcome, actor(auth))));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ResponseWrapper.error(e.getMessage(), e.getMessage()));
+        }
+    }
+
+    // ── Pipeline (Kanban board) ──────────────────────────────────────────────────
+    @GetMapping("/pipeline")
+    public ResponseEntity<ResponseWrapper<Object>> pipeline() {
+        return ResponseEntity.ok(ResponseWrapper.success(leadService.getBoard()));
+    }
+
     // ── Counselors ────────────────────────────────────────────────────────────
     @GetMapping("/counselors")
     public ResponseEntity<ResponseWrapper<Object>> counselors() {

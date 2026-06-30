@@ -4,6 +4,7 @@ import { Navigation } from '../common/Navigation';
 import { Footer } from '../common/Footer';
 import { ChatbotWidget } from '../common/ChatbotWidget';
 import { admissionService } from '../../services/admissionService';
+import { trackEvent } from '../../utils/tracking';
 import { toast } from 'react-toastify';
 
 // ── Eligibility rules ──────────────────────────────────────────
@@ -225,6 +226,14 @@ export const PreRegisterPage = () => {
   const eligibilityResult = selectedProgram
     ? checkEligibility(selectedProgram, academic.sscResult, academic.hscResult, academic.sscGroup)
     : null;
+
+  // Funnel event: fire once a program + both GPAs are present (debounced via deps).
+  useEffect(() => {
+    if (selectedProgram && academic.sscResult && academic.hscResult && eligibilityResult) {
+      trackEvent('eligibility_checked', { program: selectedProgram, eligible: eligibilityResult.eligible });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProgram, academic.sscResult, academic.hscResult]);
 
   const schedule = selectedFaculty ? SCHEDULE[getFacultyKey(selectedFaculty)] : null;
 

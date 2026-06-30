@@ -111,6 +111,57 @@ public class LeadService {
         return logActivity(id, "NOTE", detail, actor);
     }
 
+    // ── Follow-ups ─────────────────────────────────────────────────────────────
+    public Lead scheduleFollowUp(Long id, String dueAtIso, String note, String actor) {
+        Lead lead = leadRepository.findById(id).orElseThrow(() -> new RuntimeException("LEAD_NOT_FOUND"));
+        LocalDateTime due;
+        try {
+            // Accept both "2026-07-01T10:00" and "2026-07-01T10:00:00".
+            due = LocalDateTime.parse(dueAtIso);
+        } catch (Exception e) {
+            throw new RuntimeException("INVALID_DATE");
+        }
+        lead.setNextFollowUpAt(due);
+        Lead saved = leadRepository.save(lead);
+        String detail = "Follow-up scheduled for " + due + (note != null && !note.isBlank() ? " — " + note : "");
+        logActivity(id, "FOLLOW_UP", detail, actor);
+        return saved;
+    }
+
+    public Lead completeFollowUp(Long id, String outcome, String actor) {
+        Lead lead = leadRepository.findById(id).orElseThrow(() -> new RuntimeException("LEAD_NOT_FOUND"));
+        lead.setNextFollowUpAt(null);
+        Lead saved = leadRepository.save(lead);
+        logActivity(id, "NOTE", "Follow-up completed" + (outcome != null && !outcome.isBlank() ? " — " + outcome : ""), actor);
+        return saved;
+    }
+
+    /** Leads with a scheduled follow-up, soonest first, tagged overdue/today/upcoming. */
+    public List<Map<String, Object>> listFollowUps() {
+        LocalDateTime now = LocalDateTime.now();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Lead l : leadRepository.findByNextFollowUpAtIsNotNullOrderByNextFollowUpAtAsc()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("lead", l);
+            LocalDateTime due = l.getNextFollowUpAt();
+            String bucket = due.isBefore(now) ? "OVERDUE"
+                    : due.toLocalDate().isEqual(now.toLocalDate()) ? "TODAY" : "UPCOMING";
+            m.put("bucket", bucket);
+            out.add(m);
+        }
+        return out;
+    }
+
+    /** Leads grouped by pipeline status for the Kanban board. */
+    public Map<String, List<Lead>> getBoard() {
+        Map<String, List<Lead>> board = new LinkedHashMap<>();
+        for (String s : STATUSES) board.put(s, new ArrayList<>());
+        for (Lead l : leadRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, 500)).getContent()) {
+            board.computeIfAbsent(l.getStatus() == null ? "NEW" : l.getStatus(), k -> new ArrayList<>()).add(l);
+        }
+        return board;
+    }
+
     private LeadActivity logActivity(Long leadId, String type, String detail, String actor) {
         return activityRepository.save(LeadActivity.builder()
                 .leadId(leadId).type(type).detail(detail).createdBy(actor).build());
@@ -142,6 +193,7 @@ public class LeadService {
         out.put("newLeadsThisWeek", newThisWeek);
         out.put("leadsByStatus", byStatus);
         out.put("leadsBySource", bySource);
+        out.put("followUpsDue", leadRepository.countByNextFollowUpAtBefore(LocalDateTime.now().plusDays(1)));
         out.put("recentLeads", leadRepository.findTop5ByOrderByCreatedAtDesc());
         return out;
     }

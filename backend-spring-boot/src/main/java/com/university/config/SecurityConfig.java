@@ -30,9 +30,13 @@ public class SecurityConfig {
                 .requestMatchers("/v1/ai/**").permitAll()
                 // Public lead capture (website contact / request-info forms)
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/v1/leads").permitAll()
-                // Admin portal — every endpoint here requires the ADMIN role.
-                // Hiding the /admin URL is not security; this is the real gate.
-                .requestMatchers("/v1/admin/**").hasRole("ADMIN")
+                // Public, fire-and-forget chatbot logging (no auth, no PII)
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/v1/chat/log").permitAll()
+                // Admin portal — requires one of the staff roles. Hiding the
+                // /admin URL is not security; this is the real gate. Sensitive
+                // actions (e.g. user management) re-check for ADMIN in-controller.
+                .requestMatchers("/v1/admin/**")
+                    .hasAnyRole("ADMIN", "ADMISSION_OFFICER", "MARKETING", "FACULTY_ADMIN")
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/v1/notices").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/v1/notices/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/v1/jobs").permitAll()

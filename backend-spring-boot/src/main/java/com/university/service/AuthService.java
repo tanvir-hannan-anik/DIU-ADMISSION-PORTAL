@@ -126,9 +126,9 @@ public class AuthService {
         String role = user.getRole() != null ? user.getRole() : "student";
         String token = jwtUtil.generateToken(email, role);
 
-        // Audit successful admin logins specifically (feeds Login History).
-        if ("admin".equalsIgnoreCase(role)) {
-            auditService.record(email, "LOGIN_SUCCESS", "Admin login", request);
+        // Audit successful staff logins (feeds the admin Login History).
+        if (!"student".equalsIgnoreCase(role)) {
+            auditService.record(email, "LOGIN_SUCCESS", role + " login", request);
         }
 
         java.util.Map<String, Object> userInfo = new java.util.HashMap<>();

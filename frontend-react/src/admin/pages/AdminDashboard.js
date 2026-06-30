@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { T } from '../theme';
 import { downloadCsv } from '../utils';
 import adminApi from '../adminApi';
+import { analyticsApi } from '../analyticsApi';
 import Dropdown from '../components/Dropdown';
 import {
   KPIS, VISITOR_SOURCES, REALTIME_SERIES, DEVICE_BREAKDOWN, TOP_PAGES,
@@ -15,6 +16,11 @@ import {
 } from '../dashboard/widgets';
 import { CHART_COLORS } from '../theme';
 
+const withPct = (rows, key = 'value') => {
+  const total = rows.reduce((s, r) => s + (r[key] || 0), 0) || 1;
+  return rows.map((r, i) => ({ ...r, pct: Math.round((r[key] / total) * 1000) / 10, color: CHART_COLORS[i % CHART_COLORS.length] }));
+};
+
 const RANGES = ['Today', 'Last 7 days', 'Last 30 days', 'This Month', 'This Year'];
 
 export default function AdminDashboard() {
@@ -24,18 +30,62 @@ export default function AdminDashboard() {
   const [pagesPeriod, setPagesPeriod] = useState('This Week');
   const [journeyPeriod, setJourneyPeriod] = useState('This Week');
   const [stats, setStats] = useState(null);
+  const [analytics, setAnalytics] = useState(null); // { configured, overview, sources, pages, funnel, devices }
 
   useEffect(() => {
     adminApi.get('/v1/admin/stats').then((r) => setStats(r.data.data)).catch(() => {});
   }, []);
 
-  const sources = VISITOR_SOURCES.map((s, i) => ({ ...s, color: CHART_COLORS[i] }));
+  useEffect(() => {
+    Promise.all([
+      analyticsApi.overview(7), analyticsApi.traffic(7), analyticsApi.pages(7),
+      analyticsApi.funnel(30), analyticsApi.devices(7),
+    ]).then(([overview, traffic, pages, funnel, devices]) => {
+      setAnalytics({
+        configured: overview.configured !== false,
+        overview, sources: traffic.sources || [], pages: pages.pages || [],
+        funnel: funnel.funnel || [], devices: devices.devices || [],
+      });
+    }).catch(() => setAnalytics({ configured: false }));
+  }, []);
+
+  const aLive = analytics?.configured;
+  // Visitor charts: live from PostHog when connected, else demo data.
+  const sources = aLive && analytics.sources.length
+    ? withPct(analytics.sources)
+    : VISITOR_SOURCES.map((s, i) => ({ ...s, color: CHART_COLORS[i] }));
+  const livePages = aLive && analytics.pages.length ? analytics.pages : TOP_PAGES;
+  const liveFunnel = aLive && analytics.funnel.filter((s) => s.value > 0).length
+    ? analytics.funnel.filter((s) => s.value > 0) : FUNNEL;
+  const liveDevices = aLive && analytics.devices.length ? withPct(analytics.devices) : DEVICE_ANALYTICS;
+  const fmtK = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n ?? 0}`);
+  const totalVisitorsLabel = aLive ? fmtK(analytics.overview.uniqueVisitors) : '12.6K';
+  const activeNow = aLive ? (analytics.overview.activeNow ?? 0) : 126;
+
+  // Activity rail: real recent leads from the DB when present, else demo feed.
+  const timeAgo = (d) => {
+    if (!d) return '';
+    const s = Math.floor((Date.now() - new Date(d).getTime()) / 1000);
+    if (s < 60) return `${s}s ago`;
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  };
+  const activity = (stats?.recentLeads?.length)
+    ? stats.recentLeads.map((l, i) => ({
+        id: l.id ?? i, icon: 'person_add', tint: CHART_COLORS[i % CHART_COLORS.length],
+        title: 'Lead captured', sub: `${l.email}${l.interestedProgram ? ' · ' + l.interestedProgram : ''}`,
+        meta: l.source, time: timeAgo(l.createdAt),
+      }))
+    : ACTIVITY_FEED;
 
   // KPI cards: Leads/Applications/Admitted/Conversion are LIVE from the DB;
   // visitor metrics remain demo until the analytics pipeline (Phase 2).
   const fmtNum = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n ?? '—'}`);
   const kpiCards = [
-    KPIS[0], // Total Visitors (demo)
+    aLive
+      ? { ...KPIS[0], label: 'Unique Visitors', value: totalVisitorsLabel, delta: 0, live: true }
+      : KPIS[0], // Total Visitors (demo until PostHog connected)
     { id: 'leads', label: 'Total Leads', value: stats ? fmtNum(stats.totalLeads) : '…',
       delta: stats?.newLeadsThisWeek ?? 0, up: true, color: '#A78BFA', data: KPIS[1].data, live: true },
     { id: 'apps', label: 'Applications', value: stats ? fmtNum(stats.totalApplications) : '…',
@@ -44,7 +94,9 @@ export default function AdminDashboard() {
       delta: 0, up: true, color: '#22D3EE', data: KPIS[4].data, live: true },
     { id: 'conv', label: 'Conversion Rate', value: stats ? `${stats.applicationConversionRate ?? 0}%` : '…',
       delta: 0, up: true, color: '#FBBF24', data: KPIS[3].data, live: true },
-    { ...KPIS[5], label: 'Online Visitors' }, // demo
+    aLive
+      ? { ...KPIS[5], label: 'Active Now', value: `${activeNow}`, delta: 0, live: true }
+      : { ...KPIS[5], label: 'Online Visitors' }, // demo
   ];
 
   const handleExport = () => {
@@ -103,12 +155,20 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Demo-data banner */}
-        <div className="flex items-start gap-2 px-3 py-2 rounded-lg text-[12px]"
-             style={{ backgroundColor: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#FBBF24' }}>
-          <span className="material-symbols-outlined text-[16px] flex-shrink-0">info</span>
-          <span>KPI cards with a green dot (Leads, Applications, Admitted, Conversion) are <b>live from your database</b>. Visitor charts below remain demo until the analytics pipeline (Phase 2).</span>
-        </div>
+        {/* Data-source banner */}
+        {aLive ? (
+          <div className="flex items-start gap-2 px-3 py-2 rounded-lg text-[12px]"
+               style={{ backgroundColor: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)', color: T.up }}>
+            <span className="material-symbols-outlined text-[16px] flex-shrink-0">check_circle</span>
+            <span>All metrics are <b>live</b> — leads &amp; applications from your database, visitor analytics from PostHog.</span>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2 px-3 py-2 rounded-lg text-[12px]"
+               style={{ backgroundColor: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#FBBF24' }}>
+            <span className="material-symbols-outlined text-[16px] flex-shrink-0">info</span>
+            <span>KPI cards with a green dot (Leads, Applications, Admitted, Conversion) are <b>live from your database</b>. Visitor charts use demo data until you set <b>POSTHOG_API_KEY</b> on the API service.</span>
+          </div>
+        )}
 
         {/* KPI row */}
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
@@ -119,19 +179,19 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           <Panel title="Visitors by Source" subtitle="Where your visitors come from"
                  action={<SelectPill value={sourcePeriod} onChange={setSourcePeriod} />}>
-            <DonutWithLegend data={sources} centerValue="12.6K" centerLabel="Total Visitors" />
+            <DonutWithLegend data={sources} centerValue={totalVisitorsLabel} centerLabel="Total Visitors" />
           </Panel>
 
           <Panel title="Active Users (Real Time)" subtitle="Currently active users on your site"
                  action={<button onClick={() => navigate('/admin/realtime')} className="text-[12px] font-semibold" style={{ color: T.accent }}>View All</button>}>
-            <p className="text-[28px] font-extrabold" style={{ color: T.text }}>126</p>
+            <p className="text-[28px] font-extrabold" style={{ color: T.text }}>{activeNow}</p>
             <RealtimeArea data={REALTIME_SERIES} />
             <DeviceBars items={DEVICE_BREAKDOWN} />
           </Panel>
 
           <Panel title="Top Pages" subtitle="By page views"
                  action={<SelectPill value={pagesPeriod} onChange={setPagesPeriod} />}>
-            <TopPagesList pages={TOP_PAGES} />
+            <TopPagesList pages={livePages} />
           </Panel>
         </div>
 
@@ -139,11 +199,11 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           <Panel title="User Journey" subtitle="See how users navigate your site"
                  action={<SelectPill value={journeyPeriod} onChange={setJourneyPeriod} />}>
-            <FunnelChart stages={FUNNEL} />
+            <FunnelChart stages={liveFunnel} />
           </Panel>
 
           <Panel title="Device Analytics" subtitle="By device type">
-            <DonutWithLegend data={DEVICE_ANALYTICS} centerValue="12.6K" centerLabel="Total" />
+            <DonutWithLegend data={liveDevices} centerValue={totalVisitorsLabel} centerLabel="Total" />
           </Panel>
 
           <Panel title="AI Prediction Overview" subtitle="AI insights for your leads">
@@ -157,7 +217,7 @@ export default function AdminDashboard() {
       {/* Right — live activity rail */}
       <aside className="hidden xl:block w-80 flex-shrink-0 border-l p-4 sticky top-0 self-start"
              style={{ borderColor: T.border, height: 'calc(100vh - 4rem)' }}>
-        <ActivityFeed items={ACTIVITY_FEED} onViewAll={() => navigate('/admin/events')} />
+        <ActivityFeed items={activity} onViewAll={() => navigate('/admin/leads')} />
       </aside>
     </div>
   );
