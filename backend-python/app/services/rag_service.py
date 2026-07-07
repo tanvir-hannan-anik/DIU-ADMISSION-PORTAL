@@ -18,7 +18,7 @@ import logging
 import os
 
 from app.config.settings import Config
-from app.services import embedding_service, vector_store_service
+from app.services import embedding_service, vector_store_service, keyword_search_service
 from app.services.rag_knowledge_seed import SEED_DOCS
 
 logger = logging.getLogger(__name__)
@@ -232,6 +232,51 @@ def retrieve(query: str) -> dict:
         title = p.get("title", "Knowledge")
         blocks.append(f"[{title}]\n{p.get('text', '')}")
     return {"context": "\n\n".join(blocks), "hits": hits}
+
+
+def build_context(query: str) -> dict:
+    """
+    Fused retrieval for the chat layer.
+
+    Combines two independent signals so short / keyword messages ("Ai", "web",
+    "law") still resolve to real departments even when the vector search finds
+    nothing:
+
+      • KEYWORD layer — always runs (no Gemini/Qdrant needed). Maps the query to
+        departments via the curated topic map + dataset inverted index.
+      • VECTOR layer  — runs only when RAG is available; adds semantically
+        similar chunks (fees, faculty, policies, scraped live data).
+
+    Returns {context, hits, keyword_matched, keyword_depts, short_query}.
+    `context` is "" only when BOTH layers produce nothing → caller uses legacy.
+    """
+    # 1) Keyword layer — cheap, offline, always attempted.
+    try:
+        kw_context, kw_matched, kw_depts = keyword_search_service.build_context(query)
+    except Exception as e:  # noqa: BLE001 - keyword layer must never break chat
+        logger.warning("Keyword matching failed: %s", e)
+        kw_context, kw_matched, kw_depts = "", False, []
+
+    # 2) Vector layer — only when RAG is configured/enabled.
+    vector_context, hits = "", []
+    if is_available():
+        try:
+            result = retrieve(query)
+            vector_context = result.get("context", "")
+            hits = result.get("hits", [])
+        except Exception as e:  # noqa: BLE001 - degrade gracefully to keyword only
+            logger.warning("Vector retrieval failed (%s) — keyword layer only", e)
+
+    blocks = [b for b in (kw_context, vector_context) if b]
+    return {
+        "context": "\n\n".join(blocks),
+        "hits": hits,
+        "keyword_matched": kw_matched,
+        "keyword_depts": kw_depts,
+        # True only for short INTEREST-style messages ("Ai", "game") — NOT short
+        # factual questions ("cse fee") or bare dept codes. Gates reco mode.
+        "short_query": keyword_search_service.is_interest_query(query),
+    }
 
 
 def status() -> dict:

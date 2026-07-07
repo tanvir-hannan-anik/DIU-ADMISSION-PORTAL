@@ -30,7 +30,9 @@ def process_prompt():
             return jsonify({'success': False, 'message': 'Prompt is required', 'errorCode': 'VALIDATION_ERROR'}), 400
 
         prompt = data.get('prompt', '').strip()
-        if len(prompt) < 3:
+        # Allow short keyword messages like "Ai", "ML", "CE" — the keyword layer
+        # resolves these to relevant departments. Only reject empty / 1-char noise.
+        if len(prompt) < 2:
             return jsonify({'success': False, 'message': 'Prompt too short', 'errorCode': 'VALIDATION_ERROR'}), 400
 
         groq_service = get_groq_service()

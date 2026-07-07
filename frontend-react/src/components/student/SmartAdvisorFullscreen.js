@@ -362,7 +362,7 @@ export const SmartAdvisorFullscreen = ({
                         style={m.role === 'user'
                           ? { backgroundColor: '#0c1282', color: 'white' }
                           : { backgroundColor: 'white', color: '#191c1e', border: '1px solid rgba(198,197,212,0.1)' }}>
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                        <p className={`text-sm leading-relaxed whitespace-pre-wrap ${m.role === 'assistant' ? 'ai-answer' : ''}`}>{m.content}</p>
                       </div>
                       <span className="text-xs font-bold uppercase tracking-widest"
                         style={{ color: 'rgba(70,70,82,0.5)' }}>

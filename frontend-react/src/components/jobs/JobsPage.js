@@ -41,12 +41,23 @@ const COMMON_SKILLS = [
   'Flutter','TensorFlow','Kubernetes','PHP','Laravel','DevOps','Figma',
 ];
 
+// Deterministic pseudo-random in [0, range) seeded from a string, so a given
+// job always shows the SAME match score across re-renders (no Math.random jitter).
+function seededInt(seed, range) {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h) % range;
+}
+
 function computeMatch(description = '', techSkills = []) {
-  if (!description || !techSkills.length) return Math.floor(Math.random() * 30) + 20;
+  if (!description || !techSkills.length) return 20 + seededInt(description || 'job', 30);
   const desc = description.toLowerCase();
   const hits = techSkills.filter(s => desc.includes(s.toLowerCase()));
   const base = Math.round((hits.length / Math.max(techSkills.length, 5)) * 100);
-  return Math.min(98, Math.max(15, base + Math.floor(Math.random() * 12)));
+  return Math.min(98, Math.max(15, base + seededInt(description, 12)));
 }
 
 function extractRequiredSkills(description = '') {
@@ -134,6 +145,10 @@ const CVTemplate = ({ profile, career, photo, targetJob = null, cvData = null })
 
   const handlePrint = () => {
     const win = window.open('', '_blank');
+    if (!win) {
+      toast.error('Please allow pop-ups for this site to download your CV.');
+      return;
+    }
     const skillsHtml = relevantSkills.map((s, i) => `
       <div class="skill-row">
         <span class="skill-name">${s}</span>

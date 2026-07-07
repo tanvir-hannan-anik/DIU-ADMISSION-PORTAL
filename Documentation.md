@@ -1,0 +1,437 @@
+# DIU University Automation Platform — Complete Technical Documentation
+
+## Project Summary
+
+This is a full-stack university automation system built for **Daffodil International University (DIU)**. It modernizes how prospective and current students interact with the university — replacing manual processes with intelligent, AI-driven workflows. The platform is designed as a **three-tier architecture** deployed on Render.com.
+
+---
+
+## Technology Stack
+
+### Frontend — React 18 SPA
+
+- **Framework:** React 18.2.0 with React Router DOM v6 (client-side routing)
+- **Styling:** Tailwind CSS 3.3.0 (utility-first responsive design)
+- **Authentication:** Firebase 12.13.0 (Google OAuth login)
+- **PDF Generation:** html2canvas + jspdf (for CV builder and reports)
+- **HTTP Client:** Axios 1.6.0
+- **Voice:** Web Speech API (browser-native, no library needed)
+- **Key Directory:** `frontend-react/src/`
+
+### Backend — Spring Boot (Java 21)
+
+- **Framework:** Spring Boot 3.2.0
+- **ORM:** Spring Data JPA with Hibernate
+- **Security:** Spring Security + JWT (jjwt 0.12.3) — stateless token-based auth
+- **Database:** PostgreSQL (production on Render.com), H2 in-memory (local development)
+- **Email:** Spring Mail via Gmail SMTP
+- **Build Tool:** Maven
+- **Role:** Acts as the central REST API gateway and data persistence layer
+- **Key Directory:** `backend-spring-boot/src/main/java/com/university/`
+
+### Backend — Python Flask (AI Microservice)
+
+- **Framework:** Flask 3.0.0 served by Gunicorn (2 workers)
+- **LLM Provider:** Groq API using `llama-3.3-70b-versatile` — 3 separate API keys for load balancing
+- **Vision/Image AI:** Groq `meta-llama/llama-4-scout-17b` (department flyer OCR)
+- **Embeddings:** Google Gemini API (`gemini-embedding-001`, 768-dimensional vectors)
+- **Vector Database:** Qdrant Cloud (cosine similarity search over RAG knowledge base)
+- **Web Scraping:** BeautifulSoup4 + lxml (live university data)
+- **PDF Processing:** pypdf + PIL
+- **Role:** Handles all AI, RAG, and LLM operations independently from the Java backend
+- **Key Directory:** `backend-python/app/`
+
+### Infrastructure & Deployment
+
+- **Hosting:** Render.com (3 services: React static site, Spring Boot Docker container, Python native service)
+- **Database:** PostgreSQL free tier on Render.com
+- **Live Jobs API:** JSearch via RapidAPI
+- **Containerization:** Docker Compose for local development
+
+---
+
+## Deployment Architecture
+
+```
+  [ React SPA — diu-frontend.onrender.com ]
+           ↓ REST API calls
+  [ Spring Boot API — diu-spring-api.onrender.com ]
+           ↓ AI requests             ↓ DB queries
+  [ Flask AI Service ]          [ PostgreSQL DB ]
+  [ Groq + RAG + Jobs ]         [ university_automation ]
+           ↓ vectors                 ↑ JPA entities
+  [ Qdrant Cloud ]          [ AdmissionApplication,
+  [ diu_kb collection ]       CourseRegistrationRecord,
+           ↓ embeddings         User, Notice, Payment... ]
+  [ Google Gemini API ]
+```
+
+---
+
+---
+
+# THE FOUR CORE FEATURES
+
+---
+
+## Feature 1 — Admission Chatbot with Automatic Form Filling (RAG-Powered)
+
+**Key Files:**
+- `frontend-react/src/components/common/ChatbotWidget.js`
+- `backend-python/app/routes/ai_routes.py`
+- `backend-python/app/services/groq_service.py`
+- `frontend-react/src/hooks/useVoice.js`
+
+### What It Does
+
+The Admission Chatbot is a conversational AI assistant that guides prospective students through the entire DIU admission process — from answering questions about university life to **automatically filling out official admission forms** based on a natural conversation.
+
+### Two Operating Modes
+
+**Mode 1 — Q&A Mode (RAG-Powered)**
+
+The chatbot answers any question about DIU — departments, fees, waivers, faculty, facilities, eligibility — by retrieving accurate information from the vector knowledge base in real time. The answer is always grounded in verified university data, not fabricated by the AI.
+
+**Mode 2 — Form-Guided Mode (Automatic Form Filling)**
+
+The AI conducts a structured conversation to collect all required form fields. As the user speaks or types their answers, the AI extracts and validates structured data:
+
+- **Pre-Registration Form fields:** `fullName`, `email`, `dateOfBirth`, `sscResult`, `hscResult`, `sscGroup`, `sscBoard`, `programHint`
+- **Online Admit Card fields:** All of the above plus `fatherName`, `motherName`, `gender`, `division`, `presentAddress`
+
+Once all fields are collected through the conversation, the form is **automatically populated** — no manual data entry needed.
+
+### Voice Integration
+
+- **Speech-to-text:** Browser Web Speech API — mic button in the chatbot
+- **Text-to-speech:** The AI reads its responses aloud (toggleable)
+- In Form Mode, spoken answers are auto-submitted after a 1.5-second silence
+- Compatible with Chrome, Edge, and Safari (desktop and mobile)
+
+### Backend Endpoint
+
+`POST /api/v1/ai/process` — routes through Spring Boot proxy to the Python AI service, which runs the RAG retrieval pipeline before calling Groq.
+
+---
+
+## Feature 2 — Smart Advisor with Automatic Course Registration (RAG-Powered)
+
+**Key Files:**
+- `frontend-react/src/components/student/SmartAdvisorFullscreen.js`
+- `backend-python/app/routes/ai_routes.py` (line 68, `/smart-advisor` endpoint)
+
+### What It Does
+
+The Smart Advisor is a full-page AI counselor available to admitted students. It acts like a personal academic advisor — understanding a student's interests, academic results, and career goals, then recommending the most suitable department and automatically handling course registration.
+
+### Key Capabilities
+
+- **Department Recommendation Engine:** The AI gathers GPA, budget, career goals, and interests conversationally, then recommends the best-fit department with side-by-side comparison tables
+- **Eligibility Verification:** Checks student records against department requirements in real time
+- **Fee Calculation with Waiver Policy:** Calculates exact tuition cost accounting for GPA-based scholarships (`waiver-policy2025.pdf` is indexed in RAG)
+- **Automatic Course Registration:** After advising is complete, the AI can trigger course registration workflows directly through the backend
+- **Career Guidance:** AI/ML queries are automatically routed to prioritize CIS → CSE → SWE departments
+- **File Upload & Image Analysis:** Students can upload documents; the Groq vision model analyzes them
+- **Voice Support:** Full speech-in / speech-out like the admission chatbot
+
+### Backend Endpoint
+
+`POST /api/v1/ai/smart-advisor` — uses a dedicated second Groq API key (key 2) to avoid rate limiting, with RAG retrieval active for all department and policy queries.
+
+---
+
+## Feature 3 — Job Section with Live Job Listings
+
+**Key Files:**
+- `frontend-react/src/components/jobs/JobsPage.js`
+- `backend-python/app/routes/jobs_routes.py`
+- `frontend-react/src/services/jobService.js`
+
+### What It Does
+
+A career portal integrated directly into the university platform. Students can browse live job listings, check how well their skills match each job, analyze skill gaps, and generate a professional CV — all without leaving the platform.
+
+### Job Sources
+
+- **Live Jobs (JSearch RapidAPI):** Real-time job listings fetched via `https://jsearch.p.rapidapi.com/search` — keyword search by role and location (default: Bangladesh)
+- **Fallback Pool:** 15 curated Bangladeshi tech company listings (used when the API is unavailable)
+
+### Key Capabilities
+
+**Skill Matching Algorithm**
+Each job listing shows a percentage match score based on comparing the student's declared skills against keywords extracted from the job description.
+
+**Skill Gap Analysis**
+For any job, the system identifies which required skills the student currently lacks — giving them a concrete roadmap for what to learn next.
+
+**CV Builder with PDF Export**
+Students fill in their profile (education, experience, skills, summary) and the system generates a professionally formatted PDF resume using html2canvas + jspdf. An AI-powered feature can auto-generate the professional summary from the career profile data.
+
+**Job Filters & Search**
+Keyword search, location filtering, and date posted filters for refining results.
+
+### Backend Endpoints
+
+- `GET /api/v1/jobs/search` — internal search from database
+- `GET /api/v1/jobs/external` — live JSearch API call with fallback
+
+---
+
+## Feature 4 — Smart Proctor
+
+**Key Files:**
+- `frontend-react/src/components/proctor/SmartProctorPage.js`
+- `backend-python/app/routes/ai_routes.py` (line 116, `/smart-proctor` endpoint)
+
+### What It Does
+
+An AI-powered student affairs assistant that handles university discipline, complaint filing, and appointment booking — replacing in-person visits to the proctor's office for routine matters.
+
+### Key Capabilities
+
+**University Rules Q&A**
+Students ask questions about university regulations and receive accurate, policy-grounded answers.
+
+**Structured Complaint Filing**
+The AI guides the student through filing a formal complaint by gathering all required fields conversationally: what happened, when, where, and who was involved. A unique **Complaint ID** (format: `COMP-YYYY-XXXX`) is generated and issued.
+
+**Appointment Booking System**
+Students can book appointments with the proctor. Available slots: Monday–Thursday at 10am, 12pm, 2pm, 4pm. A unique **Appointment ID** (format: `APT-YYYY-XXXX`) is generated upon confirmation.
+
+**Emergency Assistance**
+Immediate access to campus security contact information for urgent situations.
+
+**Voice Support**
+Full voice input and output — a student can file a complaint entirely by speaking.
+
+### Backend Endpoint
+
+`POST /api/v1/ai/smart-proctor` — uses a dedicated third Groq API key (key 3) for full isolation from the other AI features.
+
+---
+
+---
+
+# THE RAG SYSTEM — The Project's Core Innovation
+
+The **Retrieval-Augmented Generation (RAG)** system is the single most important technological achievement of this project. It is what transforms the chatbots from generic AI assistants into accurate, university-specific knowledge systems that never hallucinate critical information about DIU.
+
+**Key Files:**
+- `backend-python/app/services/rag_service.py`
+- `backend-python/app/services/vector_store_service.py`
+- `backend-python/app/services/embedding_service.py`
+- `backend-python/app/services/web_scraper_service.py`
+- `backend-python/app/services/rag_knowledge_seed.py`
+- `backend-python/app/services/ingestion_service.py`
+
+---
+
+## Why RAG Changes Everything
+
+Without RAG, the LLM would answer questions about DIU from its training data — which is either outdated, incomplete, or simply wrong about a specific Bangladeshi university. With RAG, every answer is **retrieved first** from a verified, up-to-date knowledge base, then passed to the LLM to generate a fluent, context-aware response. The LLM becomes a language formatter, not a fact source.
+
+This is what enables the system to accurately answer questions like:
+- "What is the waiver for a 4.80 GPA student in CSE?"
+- "Who is the head of the CIS department?"
+- "What are the eligibility requirements for the BBA program?"
+
+---
+
+## The Four Knowledge Sources
+
+### 1. Curated Seed Documents (`rag_knowledge_seed.py`)
+
+A hand-crafted, verified dataset covering: university leadership (VC, Pro-VC, Founder), all 51 academic programs across 6 faculties, faculty directories per department, GPA-based waiver and scholarship policies, eligibility requirements for every program, department ratings (2025), and a complete CIS curriculum breakdown (12 semesters, 136+ credits).
+
+### 2. Department Flyer OCR (`ingestion_service.py`)
+
+Physical department promotional flyers (stored as images in `department details/`) are processed using the **Groq vision model** (`llama-4-scout-17b`). The AI reads each image and extracts structured JSON containing: department name, faculty, degree, duration, fees, labs, curriculum highlights, career outcomes, and eligibility. This data is saved to `backend-python/app/data/departments_dataset.json` and indexed into Qdrant.
+
+### 3. PDF Document Indexing
+
+Two official university PDFs are parsed and indexed:
+- `waiver-policy2025.pdf` — official scholarship and waiver rules
+- `application_instruction.pdf` — official admission instructions
+
+Documents are chunked into segments of **1,200 characters with 180-character overlap** to preserve context across chunk boundaries during retrieval.
+
+### 4. Live Web Scraping (`web_scraper_service.py`)
+
+The most dynamic knowledge source — live data scraped directly from the DIU website with a **1-hour cache TTL**:
+- **Scholarship page:** `daffodilvarsity.edu.bd/scholarship/diu-scholarship`
+- **Tuition fees page:** `daffodilvarsity.edu.bd/tuition-fees`
+- **Faculty directory:** `faculty.daffodilvarsity.edu.bd`
+
+This means the chatbot always has access to the **current, published fees and scholarship information** — critical for answering admission queries accurately.
+
+---
+
+## The Embedding & Vector Store Pipeline
+
+### Embeddings (`embedding_service.py`)
+
+Every document chunk and every user query is converted to a **768-dimensional vector** using Google Gemini's `gemini-embedding-001` model. Two distinct task types are used:
+- `RETRIEVAL_DOCUMENT` — when indexing content into Qdrant
+- `RETRIEVAL_QUERY` — when embedding a user's question for search
+
+This task-type distinction improves retrieval accuracy because the embedding model is explicitly told whether it is encoding a document or a query.
+
+The service uses **3-retry exponential backoff** to handle transient Gemini API failures without breaking the chat experience.
+
+### Vector Store (`vector_store_service.py`)
+
+All document vectors are stored in **Qdrant Cloud** under the collection `diu_kb`. Qdrant uses **cosine similarity** to find the most semantically similar documents to any user query.
+- **Batch indexing:** 64 vectors per request (efficient bulk ingestion)
+- **REST API only** (no gRPC — required for Render.com compatibility)
+
+---
+
+## The Full RAG Retrieval Pipeline (Per User Message)
+
+```
+User types/speaks a question
+         ↓
+  Gemini embeds query (RETRIEVAL_QUERY, 768-dim)
+         ↓
+  Qdrant cosine search over diu_kb collection
+  (top-6 results, min score threshold: 0.30)
+         ↓
+  Retrieved chunks formatted as [Title]\n{text}
+         ↓
+  Context injected into Groq system prompt
+         ↓
+  Groq LLM generates answer grounded in retrieved facts
+         ↓
+  Language-aware response (Bangla or English)
+         ↓
+  Response displayed + optionally spoken aloud (TTS)
+```
+
+---
+
+## RAG-Specific System Prompt Design
+
+The Groq system prompt enforces strict rules when RAG context is available:
+- **No hallucination:** The LLM must only cite facts present in the retrieved context
+- **Structured templates:** 5 predefined response formats for department info, fees, faculty, scholarships, and eligibility — ensuring consistent, readable answers
+- **Language awareness:** Responds in Bangla if the student queries in Bangla
+- **Counseling flow:** For vague questions, gathers student profile step-by-step before answering
+- **Live data preference:** When scraped data is available, it takes priority over static seed data
+
+---
+
+## Graceful Degradation (Production Resilience)
+
+A critical design principle: **the chat never breaks**, even when the RAG pipeline has issues.
+
+| Failure Scenario | Fallback Behavior |
+|---|---|
+| Qdrant unavailable | Falls back to legacy static system prompt |
+| RAG returns no matches (score < 0.30) | Falls back to legacy static prompt |
+| Gemini embedding fails | Non-blocking retry; chat continues with fallback |
+| Groq API key 1 rate-limited | Smart Advisor uses key 2, Smart Proctor uses key 3 |
+| JSearch API unavailable | 15-job mock fallback list served |
+
+---
+
+## How RAG Powers the Automation Features Specifically
+
+**Admission Chatbot Form Filling:**
+RAG retrieves the exact eligibility and program requirements before the AI starts collecting form data — so the AI knows which programs the student qualifies for *before* it asks about their GPA. The AI then pre-validates inputs against retrieved rules.
+
+**Smart Advisor Course Registration:**
+RAG retrieves current curriculum data, credit requirements, and prerequisite chains. The AI uses this retrieved context to recommend a valid course schedule — not an invented one — and can then trigger the actual registration call to the Spring Boot backend.
+
+---
+
+## RAG as a Competitive Advantage
+
+The combination of **four distinct knowledge sources** (curated seed + OCR-extracted flyer data + official PDF documents + live-scraped web data), **semantic vector search** (Qdrant + Gemini embeddings), and **strict anti-hallucination prompting** creates an information retrieval system that is:
+
+1. **More accurate** than a pure LLM (grounded in real documents)
+2. **More current** than static training data (live scraping with 1-hour freshness)
+3. **More trusted** than a simple keyword search (semantic similarity, not string matching)
+4. **Fully automated** — the form-filling and course registration flows are only possible because the AI retrieves accurate, structured data to drive each decision
+
+This is what makes the RAG system the project's defining technological achievement — it is not a cosmetic add-on but the foundation that makes the automation of form filling and course registration **reliable enough to use in a real university context**.
+
+---
+
+## Summary of All Key Technologies
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| Frontend UI | React 18, Tailwind CSS | SPA interface |
+| Authentication | Firebase Google OAuth | Secure login |
+| REST Gateway | Spring Boot 3.2, Java 21 | API proxy, data persistence |
+| AI Orchestration | Flask, Gunicorn | AI service routing |
+| LLM | Groq `llama-3.3-70b-versatile` | Language generation |
+| Vision AI | Groq `llama-4-scout-17b` | OCR / image analysis |
+| Embeddings | Google Gemini `gemini-embedding-001` | Semantic vector creation |
+| Vector Search | Qdrant Cloud | RAG knowledge retrieval |
+| Web Scraping | BeautifulSoup4 + lxml | Live university data |
+| Relational DB | PostgreSQL (Render.com) | Student records, forms |
+| Live Jobs | JSearch RapidAPI | Real job listings |
+| PDF Export | jspdf + html2canvas | CV generation |
+| Voice | Web Speech API | Hands-free interaction |
+| Deployment | Render.com | Cloud hosting |
+
+---
+
+## Environment Variables Reference
+
+### Python AI Service
+
+```
+GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3
+GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_VISION_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
+GEMINI_API_KEY
+GEMINI_EMBED_MODEL=gemini-embedding-001
+QDRANT_URL, QDRANT_API_KEY
+QDRANT_COLLECTION=diu_kb
+RAG_ENABLED=true
+RAG_TOP_K=6
+RAG_MIN_SCORE=0.30
+RAPIDAPI_KEY
+FLASK_ENV=production
+MAX_TOKENS=1024
+```
+
+### Spring Boot (Production)
+
+```
+SPRING_PROFILES_ACTIVE=prod
+DB_HOST, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD
+PYTHON_SERVICE_URL=http://python-service:5000
+CORS_ALLOWED_ORIGINS
+JWT_SECRET
+MAIL_USERNAME, MAIL_PASSWORD
+```
+
+### React Frontend
+
+```
+REACT_APP_API_URL
+REACT_APP_AI_URL
+REACT_APP_TIMEOUT=30000
+REACT_APP_DEBUG=false
+```
+
+---
+
+## Database Schema (Spring Boot Entities)
+
+**Location:** `backend-spring-boot/src/main/java/com/university/model/entity/`
+
+| Entity | Purpose |
+|---|---|
+| `User.java` | JWT authentication, student/admin accounts |
+| `AdmissionApplication.java` | Pre-registration and admit card form data |
+| `AdmittedStudent.java` | Confirmed enrolled students |
+| `CourseRegistrationRecord.java` | Semester course selections |
+| `LateRegistrationRecord.java` | Late registration tracking |
+| `Payment.java` | Fee payment records |
+| `ScholarshipApplication.java` | Waiver and scholarship applications |
+| `JobListing.java` | Stored job listings |
+| `Notice.java` | University announcements |

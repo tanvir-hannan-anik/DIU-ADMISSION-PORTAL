@@ -5,7 +5,8 @@
 [![Frontend](https://img.shields.io/badge/Frontend-React%2018-61DAFB?logo=react&logoColor=white)](#)
 [![Backend](https://img.shields.io/badge/Backend-Spring%20Boot%203.2-6DB33F?logo=springboot&logoColor=white)](#)
 [![AI Service](https://img.shields.io/badge/AI-Flask%20%2B%20Groq-000000?logo=flask&logoColor=white)](#)
-[![Database](https://img.shields.io/badge/DB-PostgreSQL-4169E1?logo=postgresql&logoColor=white)](#)
+[![Database](https://img.shields.io/badge/DB-Supabase%20Postgres-3ECF8E?logo=supabase&logoColor=white)](#)
+[![Analytics](https://img.shields.io/badge/Analytics-PostHog%20%2B%20Clarity-F54E00?logo=posthog&logoColor=white)](#)
 [![Deploy](https://img.shields.io/badge/Deploy-Render.com-46E3B7?logo=render&logoColor=white)](#)
 
 ---
@@ -15,6 +16,8 @@
 The DIU University Automation Platform modernizes how prospective and current students interact with the university. It is built as a **three-tier architecture** combining a React single-page app, a Spring Boot REST gateway, and a Python AI microservice powered by a **Retrieval-Augmented Generation (RAG)** knowledge system.
 
 The RAG system is the project's core innovation: every AI answer is grounded in verified, up-to-date university data — from curated documents, OCR-extracted department flyers, official PDFs, and live-scraped web pages — so the assistants never hallucinate critical facts about DIU.
+
+On the staff side, a **role-based Admin & CRM Portal** turns those same student interactions into an operational dashboard — lead capture, an admissions pipeline, chat analytics, audit logging, and real visitor metrics pulled live from **PostHog** and **Microsoft Clarity**.
 
 ---
 
@@ -26,6 +29,7 @@ The RAG system is the project's core innovation: every AI answer is grounded in 
 | 2 | **Smart Advisor** | A full-page AI academic counselor that recommends the best-fit department, calculates fees with waiver policy, and **automatically handles course registration**. |
 | 3 | **Job Section** | Live job listings (JSearch API), skill-match scoring, skill-gap analysis, and a **CV builder with PDF export**. |
 | 4 | **Smart Proctor** | AI student-affairs assistant for university rules Q&A, structured complaint filing, and appointment booking. |
+| 5 | **Admin & CRM Portal** | Role-based staff dashboard (`/admin`): lead/CRM pipeline, applications, follow-ups, chat analytics, user & role management, audit logs, and live visitor analytics from PostHog + Microsoft Clarity. |
 
 All AI features support **hands-free voice interaction** via the browser Web Speech API (speech-to-text and text-to-speech).
 
@@ -38,10 +42,10 @@ All AI features support **hands-free voice interaction** via the browser Web Spe
            |  REST API calls
            v
   [ Spring Boot API — diu-spring-api.onrender.com ]
-       |  AI requests              |  DB queries
-       v                           v
-  [ Flask AI Service ]        [ PostgreSQL DB ]
-  [ Groq + RAG + Jobs ]       [ university_automation ]
+       |  AI requests              |  DB queries          |  metrics
+       v                           v                      v
+  [ Flask AI Service ]        [ Supabase Postgres ]   [ PostHog + MS Clarity ]
+  [ Groq + RAG + Jobs ]       [ Session Pooler/IPv4 ] [ visitor analytics APIs ]
        |  vectors
        v
   [ Qdrant Cloud ]  <--  [ Google Gemini Embeddings ]
@@ -57,12 +61,15 @@ All AI features support **hands-free voice interaction** via the browser Web Spe
 - **Tailwind CSS 3.3** for responsive styling
 - **Firebase 12** — Google OAuth authentication
 - **html2canvas + jsPDF** — CV/report PDF generation
+- **Recharts** — admin dashboard charts · **React-Toastify** — notifications · **React-Icons**
+- **PostHog** browser snippet + UTM tracking (`src/utils/tracking.js`)
 - **Axios** HTTP client · **Web Speech API** for voice
 
 ### Backend — Spring Boot (Java 21)
 - **Spring Boot 3.2** with Spring Data JPA / Hibernate
-- **Spring Security + JWT** (jjwt) — stateless auth
-- **PostgreSQL** (production) / **H2** (local dev)
+- **Spring Security + JWT** (jjwt) — stateless auth with **role-based access** + audit logging
+- **Supabase PostgreSQL** (production, via Session Pooler) / **H2** (local dev)
+- **Admin/CRM layer** — leads, applications pipeline, chat logs, PostHog & Clarity metrics proxies
 - **Spring Mail** via Gmail SMTP · **Maven** build
 - Acts as the central REST API gateway and persistence layer
 
@@ -76,7 +83,9 @@ All AI features support **hands-free voice interaction** via the browser Web Spe
 
 ### Infrastructure
 - **Render.com** (3 services) · **Docker Compose** for local dev
+- **Supabase** — managed PostgreSQL (Session Pooler / IPv4)
 - **JSearch (RapidAPI)** for live job listings
+- **PostHog** + **Microsoft Clarity** (Data Export API) — visitor analytics surfaced in the admin portal
 
 ---
 
@@ -109,8 +118,10 @@ User question
 DIU/
 ├── frontend-react/          # React 18 SPA
 │   └── src/
-│       ├── components/      # Chatbot, Smart Advisor, Jobs, Proctor, admin
+│       ├── components/      # Chatbot, Smart Advisor, Jobs, Proctor
+│       ├── admin/           # Admin/CRM portal (pages, dashboard, analytics)
 │       ├── hooks/           # useVoice and others
+│       ├── utils/           # tracking.js (PostHog/UTM)
 │       └── services/        # API clients
 ├── backend-spring-boot/     # Spring Boot REST gateway (Java 21)
 │   └── src/main/java/com/university/
@@ -207,11 +218,16 @@ MAX_TOKENS=1024
 ### Spring Boot (Production)
 ```
 SPRING_PROFILES_ACTIVE=prod
-DB_HOST, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD
-PYTHON_SERVICE_URL=http://python-service:5000
-CORS_ALLOWED_ORIGINS
+# Supabase Postgres (Session Pooler / IPv4 — not the direct db.<ref>.supabase.co host)
+DB_HOST, DB_PORT=5432, DB_NAME=postgres, DB_USERNAME, DB_PASSWORD
+PYTHON_SERVICE_URL          # injected from diu-ai-service host
+CORS_ALLOWED_ORIGINS        # injected from diu-frontend host
 JWT_SECRET
+ADMIN_EMAIL, ADMIN_PASSWORD # seeded admin account (BCrypt-hashed on boot)
 MAIL_USERNAME, MAIL_PASSWORD
+# Analytics read-back for the admin dashboard
+POSTHOG_API_KEY, POSTHOG_PROJECT_ID, POSTHOG_HOST=https://us.posthog.com
+CLARITY_API_TOKEN, CLARITY_PROJECT_ID
 ```
 
 ### React Frontend
@@ -233,6 +249,9 @@ REACT_APP_DEBUG=false
 | `POST` | `/api/v1/ai/smart-proctor` | Smart Proctor (uses Groq key 3) |
 | `GET`  | `/api/v1/jobs/search` | Internal job search |
 | `GET`  | `/api/v1/jobs/external` | Live JSearch listings (with fallback) |
+| `POST` | `/api/v1/leads` | Public lead capture (admission submit auto-creates a lead) |
+| `GET`  | `/api/v1/admin/leads` · `/stats` · `/applications` | Admin CRM data (role-protected) |
+| `GET`  | `/api/v1/admin/analytics` · `/clarity` | Live PostHog / Microsoft Clarity metrics |
 
 ---
 
@@ -240,7 +259,9 @@ REACT_APP_DEBUG=false
 
 Located in `backend-spring-boot/src/main/java/com/university/model/entity/`:
 
-`User` · `AdmissionApplication` · `AdmittedStudent` · `CourseRegistrationRecord` · `LateRegistrationRecord` · `Payment` · `ScholarshipApplication` · `JobListing` · `Notice`
+**Core:** `User` · `StudentProfile` · `AdmissionApplication` · `AdmittedStudent` · `CourseRegistrationRecord` · `LateRegistrationRecord` · `Payment` · `ScholarshipApplication` · `JobListing` · `Notice` · `StudentNotification`
+
+**Admin / CRM:** `Lead` · `LeadActivity` · `Counselor` · `ChatLog` · `AdminAuditLog`
 
 ---
 

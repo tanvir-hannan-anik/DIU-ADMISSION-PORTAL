@@ -337,7 +337,7 @@ export function SmartProctorPage() {
                     {msg.fileAttachment.name}
                   </div>
                 )}
-                <div className={`p-4 shadow-sm text-sm leading-relaxed ${msg.role === 'user' ? 'text-white' : ''}`}
+                <div className={`p-4 shadow-sm text-sm leading-relaxed ${msg.role === 'user' ? 'text-white' : 'ai-answer'}`}
                   style={{
                     backgroundColor: msg.role === 'user' ? '#0c1282' : '#f2f4f6',
                     color: msg.role === 'user' ? '#ffffff' : '#191c1e',

@@ -16,6 +16,27 @@ ANSWER_FORMAT_RULES = """ANSWER FORMATTING (STRICT — follow in every reply):
 - For unordered lists use '- ' bullet points.
 - Keep replies clean and scannable: short paragraphs with a blank line between sections."""
 
+# ── Short / keyword query recommendation note (appended in rag-keyword mode) ──
+# Injected when the user sends a brief keyword-style message (e.g. "Ai", "web",
+# "law") that the keyword layer matched to specific departments. Tells the model
+# to treat the keyword as an interest and proactively recommend those matches.
+SHORT_QUERY_RECO_NOTE = """
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SHORT / KEYWORD QUERY — RECOMMENDATION MODE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The user sent a very short, keyword-style message. Treat it as their field of
+INTEREST, not a complete question. Based on the KEYWORD-MATCHED DEPARTMENTS
+section above, do the following:
+1. Open with one friendly line acknowledging their interest in this topic.
+2. Recommend the matched departments IN THE GIVEN ORDER ({DEPTS}) as a short
+   numbered list — for each, one line on WHY it fits this interest (use only the
+   grounded facts above; never invent).
+3. End with ONE follow-up question to narrow down (e.g. their academic group,
+   GPA, or whether they want fees / eligibility / curriculum for a specific one).
+Keep it concise (120–200 words). Do NOT dump full department details yet.
+"""
+
 # ── Structured response templates (applied in RAG mode) ──────────────────────
 STRUCTURED_TEMPLATES = """
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -604,30 +625,42 @@ class GroqService:
         """
         Return (system_prompt, mode).
 
-        Tries RAG first: retrieve context for this query and inject it into the
-        slim grounded prompt. Any RAG failure (Qdrant/Gemini down, no matches)
-        degrades gracefully to the legacy static prompt so production keeps
-        working.
+        Uses the fused retriever (keyword matching + vector search). Short /
+        keyword messages ("Ai", "web", "law") resolve to real departments via
+        the keyword layer even when the vector search finds nothing, so the bot
+        gives a grounded recommendation instead of dropping to the legacy prompt.
+        Any total failure still degrades gracefully to the legacy static prompt.
         """
-        if not rag_service.is_available():
-            return self._legacy_system_prompt(), "legacy"
         try:
-            result = rag_service.retrieve(prompt)
-            context = result.get("context", "")
-            if not context:
-                logger.info("RAG returned no matches — falling back to legacy prompt")
-                return self._legacy_system_prompt(), "legacy-no-hits"
-            logger.info("RAG retrieved %d chunks", len(result.get("hits", [])))
-            rag_prompt = (
-                RAG_SYSTEM_PROMPT
-                .replace("{STRUCTURED_TEMPLATES}", STRUCTURED_TEMPLATES)
-                .replace("{ANSWER_FORMAT}", ANSWER_FORMAT_RULES)
-                .replace("{RETRIEVED_CONTEXT}", context)
-            )
-            return rag_prompt, "rag"
-        except Exception as e:  # noqa: BLE001 - never break chat on RAG failure
-            logger.warning("RAG retrieval failed (%s) — using legacy prompt", e)
+            result = rag_service.build_context(prompt)
+        except Exception as e:  # noqa: BLE001 - never break chat on retrieval failure
+            logger.warning("Context build failed (%s) — using legacy prompt", e)
             return self._legacy_system_prompt(), "legacy-error"
+
+        context = result.get("context", "")
+        if not context:
+            logger.info("No keyword/vector matches — falling back to legacy prompt")
+            return self._legacy_system_prompt(), "legacy-no-hits"
+
+        # Short keyword-style query with department matches → recommendation mode.
+        recommend_note = ""
+        mode = "rag"
+        if result.get("keyword_matched") and result.get("short_query"):
+            depts = ", ".join(result.get("keyword_depts", []))
+            recommend_note = SHORT_QUERY_RECO_NOTE.replace("{DEPTS}", depts or "the matched departments")
+            mode = "rag-keyword"
+
+        logger.info(
+            "Context built [mode=%s] — %d vector chunks, keyword_depts=%s",
+            mode, len(result.get("hits", [])), result.get("keyword_depts", []),
+        )
+        rag_prompt = (
+            RAG_SYSTEM_PROMPT
+            .replace("{STRUCTURED_TEMPLATES}", STRUCTURED_TEMPLATES)
+            .replace("{ANSWER_FORMAT}", ANSWER_FORMAT_RULES)
+            .replace("{RETRIEVED_CONTEXT}", context)
+        ) + recommend_note
+        return rag_prompt, mode
 
     def process_prompt(self, prompt: str, context: str = None, module_type: str = None, history: list = None) -> dict:
         try:

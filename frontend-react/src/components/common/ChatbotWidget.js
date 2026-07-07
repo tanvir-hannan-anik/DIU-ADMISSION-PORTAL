@@ -148,7 +148,7 @@ const MessageList = ({ messages, isLoading, messagesEndRef }) => (
         <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
           message.type === 'user'
             ? 'bg-primary text-white rounded-br-sm'
-            : 'bg-surface-container-low text-on-surface rounded-bl-sm border border-outline-variant/20'
+            : 'ai-answer bg-surface-container-low text-on-surface rounded-bl-sm border border-outline-variant/20'
         }`}>
           {message.type === 'bot' ? renderMessageContent(message.text) : message.text}
         </div>
