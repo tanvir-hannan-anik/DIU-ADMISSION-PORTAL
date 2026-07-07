@@ -1,6 +1,6 @@
 # DIU University Automation Website — Project Memory
 
-> Auto-updated on every commit. Last updated: **2026-06-30**
+> Auto-updated on every commit. Last updated: **2026-07-07**
 
 ---
 
@@ -209,6 +209,7 @@ database/                ← PostgreSQL (Render free DB: university_automation)
 
 | Date | Commit | What Changed |
 |---|---|---|
+| 2026-07-07 | `e1bd19a` | **Keyword retrieval layer + QA fixes:** fused keyword+vector retrieval so short/keyword messages ("Ai", "web") resolve to real departments. QA-verified bug fixes — short factual questions no longer hijacked into reco mode (`is_interest_query` gate); whole-word dept-code matching + plural normalisation + 0.3× noise threshold; CV "Download PDF" null-checks `window.open`; job match % made deterministic. Adds `QA_TEST_REPORT.md` |
 | 2026-06-30 | `3b47170` | **Fix Render connectivity:** `fromService property:host` returns a scheme-less hostname, so the frontend baseURL was relative, Spring CORS never matched the `https` Origin, and the Python client URL had no scheme. Prepend `https://` in apiConfig.js, CorsConfig.java (now `allowedOriginPatterns`), and PythonServiceClient.java |
 | 2026-06-27 | `b44ebbb` | **Admin Phase 1 — Lead/CRM:** Lead/Counselor entities, public `/v1/leads` capture (admission submit auto-creates a lead), admin `/leads` `/stats` `/applications`; Leads + Applications pages; dashboard KPIs live from DB; clearer login errors |
 | 2026-06-27 | `30ff60e` | **Admin portal:** role-based auth + audit logging (Spring), dark analytics dashboard at `/admin` (React/recharts), seeded admin account; switch Supabase to Session Pooler (IPv4) in render.yaml; add setup guide + Supabase MCP |
