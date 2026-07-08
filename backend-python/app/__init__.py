@@ -13,6 +13,34 @@ def create_app():
     app.register_blueprint(jobs_routes.bp)
     app.register_blueprint(live_data_routes.bp)
 
+    # Structured faculty directory + tuition fees (served from Supabase — no tokens).
+    try:
+        from app.routes import faculty_routes, tuition_routes
+        app.register_blueprint(faculty_routes.bp)
+        app.register_blueprint(tuition_routes.bp)
+    except Exception as e:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).warning("Faculty/tuition routes not loaded: %s", e)
+
+    # AI Knowledge Pipeline (Phases 1–3) — registered only if it imports cleanly
+    # so a missing optional dep (psycopg) never takes down the whole service.
+    try:
+        from app.routes import pipeline_routes, admin_routes
+        app.register_blueprint(pipeline_routes.bp)
+        app.register_blueprint(admin_routes.bp)
+    except Exception as e:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).warning("Pipeline routes not loaded: %s", e)
+
+    # Start the per-source scheduler (no-op when SCHEDULER_ENABLED=false or the DB
+    # is unconfigured — production uses Render cron instead).
+    try:
+        from app.services import scheduler_service
+        scheduler_service.start()
+    except Exception as e:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).warning("Scheduler not started: %s", e)
+
     # Load existing knowledge base into memory on startup
     try:
         from app.services.knowledge_base_service import refresh_knowledge_base

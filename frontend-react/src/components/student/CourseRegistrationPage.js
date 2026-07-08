@@ -5,6 +5,8 @@ import { SmartAdvisorFullscreen } from './SmartAdvisorFullscreen';
 import API_CONFIG from '../../config/apiConfig';
 import axios from 'axios';
 import { Navigation } from '../common/Navigation';
+import { authService } from '../../services/authService';
+import { getCurrentSemesterKey } from '../../services/studentDataService';
 
 // ── Fee constants ─────────────────────────────────────────────────────────────
 const FEE_PER_CREDIT = 30000 / 11;
@@ -349,9 +351,12 @@ export const CourseRegistrationPage = () => {
   const navigate  = useNavigate();
   const location  = useLocation();
 
-  // course state
-  const [selSem,    setSelSem]    = useState('Semester 5');
-  const [cart,      setCart]      = useState([]);
+  // course state — auto-load the courses assigned to the student's current semester
+  const currentSem = getCurrentSemesterKey(authService.getUser()?.email);
+  const [selSem,    setSelSem]    = useState(currentSem);
+  const [cart,      setCart]      = useState(() =>
+    (SEMESTER_DATA[currentSem] || []).map(course => ({ course, type: 'regular' }))
+  );
   const [allChecked, setAllChecked] = useState(false);
   const [checked,   setChecked]   = useState({});
 
@@ -433,6 +438,19 @@ export const CourseRegistrationPage = () => {
 
   // Completed courses = all courses from semesters BEFORE selSem
   const completedCodes = getCompletedCourseCodes(selSem);
+
+  // ── Semester view (driven by the "Add from:" dropdown) ──────────────────────
+  // The Selected Courses table shows the courses of the chosen semester:
+  //   • current semester  → your editable registration (the cart)
+  //   • a PAST semester    → those courses, read-only, marked "Completed"
+  //   • a FUTURE semester  → those courses, read-only, marked "Upcoming"
+  const currentIdx    = SEMESTER_ORDER.indexOf(currentSem);
+  const viewIdx       = SEMESTER_ORDER.indexOf(selSem);
+  const isCurrentView = selSem === currentSem;
+  const isPastView    = viewIdx > -1 && currentIdx > -1 && viewIdx < currentIdx;
+  const viewCourses   = isCurrentView
+    ? cart
+    : (SEMESTER_DATA[selSem] || []).map(course => ({ course, type: isPastView ? 'completed' : 'upcoming' }));
 
   const addCourse = (course, type='regular') => {
     if (cartCodes.includes(course.course_code)) { toast.warning(`${course.course_code} already added`); return; }
@@ -582,7 +600,12 @@ YOUR ROLE
   };
   const sendChat = () => sendChatText(chatInput.trim());
 
-  const pickerList = ALL_COURSES.filter(c =>
+  // Retake requests can only be for courses from PREVIOUS (completed) semesters.
+  const currentCompletedCodes = getCompletedCourseCodes(currentSem);
+  const pickerSource = pickerType === 'retake'
+    ? ALL_COURSES.filter(c => currentCompletedCodes.has(c.course_code))
+    : ALL_COURSES;
+  const pickerList = pickerSource.filter(c =>
     !cartCodes.includes(c.course_code) &&
     (c.course_code.toLowerCase().includes(pickerSearch.toLowerCase()) || c.subject.toLowerCase().includes(pickerSearch.toLowerCase()))
   );
@@ -712,17 +735,37 @@ YOUR ROLE
                 </div>
               </div>
 
+              {/* Auto-load notice */}
+              <div className="flex items-start gap-2 text-sm px-1" style={{ color:'#464652' }}>
+                <span className="material-symbols-outlined text-base" style={{ color:'#0c1282' }}>auto_awesome</span>
+                <span>
+                  Courses for your current semester (<strong style={{ color:'#000155' }}>{currentSem}</strong>) are loaded automatically.
+                  Use <strong style={{ color:'#000155' }}>View semester</strong> to browse any semester — courses from a completed
+                  semester are shown as <strong style={{ color:'#15803d' }}>Completed</strong> and are read-only.
+                </span>
+              </div>
+
               {/* Semester Picker Row */}
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
-                  <label className="text-sm font-bold" style={{ color:'#464652' }}>Add from:</label>
+                  <label className="text-sm font-bold" style={{ color:'#464652' }}>View semester:</label>
                   <select value={selSem} onChange={e => setSelSem(e.target.value)}
                     className="border rounded-lg px-3 py-1.5 text-sm font-semibold outline-none focus:ring-2"
                     style={{ background:'white', borderColor:'#c6c5d4', color:'#191c1e', focusRingColor:'#0c1282' }}>
-                    {Object.keys(SEMESTER_DATA).map(s => <option key={s} value={s}>{s}</option>)}
+                    {Object.keys(SEMESTER_DATA).map(s => {
+                      const idx = SEMESTER_ORDER.indexOf(s);
+                      const tag = s === currentSem ? ' — Current' : (idx > -1 && idx < currentIdx ? ' — Completed' : ' — Upcoming');
+                      return <option key={s} value={s}>{s}{tag}</option>;
+                    })}
                   </select>
+                  {!isCurrentView && (
+                    <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full"
+                          style={{ background: isPastView ? '#dcfce7' : '#fef3c7', color: isPastView ? '#15803d' : '#92400e' }}>
+                      {isPastView ? 'Completed · read-only' : 'Upcoming · read-only'}
+                    </span>
+                  )}
                 </div>
-                {step === 1 && (
+                {step === 1 && isCurrentView && (
                   <div className="flex gap-2">
                     <button onClick={() => { setPickerType('retake'); setPickerSearch(''); setShowPicker(true); }}
                       className="text-xs font-bold px-4 py-2 rounded-lg border transition-colors"
@@ -746,13 +789,17 @@ YOUR ROLE
               <div className="rounded-xl overflow-hidden shadow-sm" style={{ background:'white' }}>
                 <div className="p-5 flex justify-between items-center" style={{ borderBottom:'1px solid #e6e8ea' }}>
                   <h3 className="font-bold" style={{ color:'#000155' }}>
-                    Selected Courses
-                    <span className="ml-2 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background:'#eff6ff', color:'#0c1282' }}>
-                      {cart.length}
+                    {isCurrentView ? 'Selected Courses' : `${selSem} Courses`}
+                    <span className="ml-2 text-xs font-bold px-2 py-0.5 rounded-full"
+                          style={{ background: isCurrentView ? '#eff6ff' : isPastView ? '#dcfce7' : '#fef3c7',
+                                   color: isCurrentView ? '#0c1282' : isPastView ? '#15803d' : '#92400e' }}>
+                      {viewCourses.length}
                     </span>
                   </h3>
                   <div className="text-xs font-bold" style={{ color:'#464652' }}>
-                    {fees.totalCr} credits selected
+                    {isCurrentView
+                      ? `${fees.totalCr} credits selected`
+                      : `${viewCourses.reduce((s, c) => s + c.course.credits, 0)} credits`}
                   </div>
                 </div>
 
@@ -761,8 +808,10 @@ YOUR ROLE
                     <thead style={{ background:'#f2f4f6' }}>
                       <tr>
                         <th className="p-4 w-12">
-                          <input type="checkbox" checked={allChecked} onChange={toggleAll}
-                            className="rounded" style={{ accentColor:'#0c1282' }} />
+                          {isCurrentView && (
+                            <input type="checkbox" checked={allChecked} onChange={toggleAll}
+                              className="rounded" style={{ accentColor:'#0c1282' }} />
+                          )}
                         </th>
                         <th className="p-4 text-[11px] font-bold uppercase tracking-wider" style={{ color:'#464652' }}>Code</th>
                         <th className="p-4 text-[11px] font-bold uppercase tracking-wider" style={{ color:'#464652' }}>Course Name</th>
@@ -773,37 +822,58 @@ YOUR ROLE
                       </tr>
                     </thead>
                     <tbody>
-                      {cart.length === 0 ? (
+                      {viewCourses.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="py-14 text-center text-sm" style={{ color:'#767684' }}>
                             <span className="material-symbols-outlined text-4xl block mb-2" style={{ color:'#c6c5d4' }}>playlist_add</span>
-                            No courses selected. Use the semester selector above to add courses.
+                            No courses in your registration. Add a retake/drop, or select courses below.
                           </td>
                         </tr>
-                      ) : cart.map(({ course, type }) => (
+                      ) : viewCourses.map(({ course, type }) => {
+                        const readOnly = !isCurrentView;   // past/future semesters are view-only
+                        return (
                         <tr key={course.course_code} className="transition-colors"
-                            style={{ borderBottom:'1px solid #e6e8ea' }}
-                            onMouseEnter={e => e.currentTarget.style.background='#f7f9fb'}
-                            onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                            style={{ borderBottom:'1px solid #e6e8ea', background: readOnly ? '#fbfcfd' : 'transparent' }}
+                            onMouseEnter={e => e.currentTarget.style.background = readOnly ? '#f6f8fa' : '#f7f9fb'}
+                            onMouseLeave={e => e.currentTarget.style.background = readOnly ? '#fbfcfd' : 'transparent'}>
                           <td className="p-4">
-                            <input type="checkbox" checked={!!checked[course.course_code]} onChange={() => toggleCheck(course.course_code)}
-                              className="rounded" style={{ accentColor:'#0c1282' }} />
+                            {readOnly ? (
+                              <span className="material-symbols-outlined text-lg"
+                                    style={{ color: isPastView ? '#16a34a' : '#94a3b8', fontVariationSettings:"'FILL' 1" }}>
+                                {isPastView ? 'check_circle' : 'schedule'}
+                              </span>
+                            ) : (
+                              <input type="checkbox" checked={!!checked[course.course_code]} onChange={() => toggleCheck(course.course_code)}
+                                className="rounded" style={{ accentColor:'#0c1282' }} />
+                            )}
                           </td>
                           <td className="p-4 font-mono text-sm font-bold" style={{ color:'#0c1282' }}>{course.course_code}</td>
                           <td className="p-4 font-bold text-sm max-w-xs truncate" style={{ color:'#191c1e' }}>{course.subject}</td>
                           <td className="p-4 text-center text-sm" style={{ color:'#191c1e' }}>{course.credits}.0</td>
                           <td className="p-4">
-                            <select value={type} onChange={e => changeType(course.course_code, e.target.value)}
-                              disabled={step > 1}
-                              className="text-xs font-semibold border rounded px-2 py-1 outline-none"
-                              style={{ borderColor:'#c6c5d4', background:'#f7f9fb', color: type==='retake' ? '#b45309' : type==='drop' ? '#ba1a1a' : '#191c1e' }}>
-                              <option value="regular">Regular</option>
-                              <option value="retake">Retake</option>
-                              <option value="drop">Drop</option>
-                            </select>
+                            {readOnly ? (
+                              <span className="text-xs font-bold px-2 py-1 rounded"
+                                    style={{ background: isPastView ? '#dcfce7' : '#fef3c7', color: isPastView ? '#15803d' : '#92400e' }}>
+                                {isPastView ? 'Completed' : 'Upcoming'}
+                              </span>
+                            ) : (
+                              <select value={type} onChange={e => changeType(course.course_code, e.target.value)}
+                                disabled={step > 1}
+                                className="text-xs font-semibold border rounded px-2 py-1 outline-none"
+                                style={{ borderColor:'#c6c5d4', background:'#f7f9fb', color: type==='retake' ? '#b45309' : type==='drop' ? '#ba1a1a' : '#191c1e' }}>
+                                <option value="regular">Regular</option>
+                                <option value="retake">Retake</option>
+                                <option value="drop">Drop</option>
+                              </select>
+                            )}
                           </td>
                           <td className="p-4">
-                            {approved ? (
+                            {readOnly ? (
+                              <span className="px-2 py-1 rounded-md text-[10px] font-bold uppercase"
+                                    style={{ background: isPastView ? '#dcfce7' : '#f2f4f6', color: isPastView ? '#15803d' : '#464652' }}>
+                                {isPastView ? 'Passed' : 'Not started'}
+                              </span>
+                            ) : approved ? (
                               <span className="px-2 py-1 rounded-md text-[10px] font-bold uppercase" style={{ background:'#d5e3fc', color:'#0d1c2e' }}>Approved</span>
                             ) : paymentDone ? (
                               <span className="px-2 py-1 rounded-md text-[10px] font-bold uppercase" style={{ background:'#fef3c7', color:'#92400e' }}>Processing</span>
@@ -812,7 +882,7 @@ YOUR ROLE
                             )}
                           </td>
                           <td className="p-4">
-                            {step === 1 && (
+                            {step === 1 && !readOnly && (
                               <button onClick={() => removeCourse(course.course_code)}
                                 className="transition-colors" style={{ color:'#767684' }}
                                 onMouseEnter={e => e.currentTarget.style.color='#ba1a1a'}
@@ -822,15 +892,16 @@ YOUR ROLE
                             )}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
 
-                {/* Add more courses row */}
-                <div className="p-4 flex flex-wrap justify-center gap-2" style={{ background:'#f2f4f6' }}>
-                  {available.filter(c => !cartCodes.includes(c.course_code)).length > 0 ? (
-                    available.filter(c => !cartCodes.includes(c.course_code)).slice(0, 4).map(course => {
+                {/* Add more courses row — only when registering the current semester */}
+                {isCurrentView ? (
+                  <div className="p-4 flex flex-wrap justify-center gap-2" style={{ background:'#f2f4f6' }}>
+                    {available.filter(c => !cartCodes.includes(c.course_code)).slice(0, 4).map(course => {
                       const missing = getMissingPrereqs(course.course_code, completedCodes);
                       const isLocked = missing.length > 0;
                       return (
@@ -852,16 +923,31 @@ YOUR ROLE
                           {course.course_code}
                         </button>
                       );
-                    })
-                  ) : null}
-                  <button onClick={() => { setPickerType('regular'); setPickerSearch(''); setShowPicker(true); }}
-                    disabled={step > 1}
-                    className="flex items-center gap-2 text-sm font-bold hover:underline disabled:opacity-40"
-                    style={{ color:'#0c1282' }}>
-                    <span className="material-symbols-outlined text-sm">add_circle</span>
-                    Browse all courses
-                  </button>
-                </div>
+                    })}
+                    <button onClick={() => { setPickerType('regular'); setPickerSearch(''); setShowPicker(true); }}
+                      disabled={step > 1}
+                      className="flex items-center gap-2 text-sm font-bold hover:underline disabled:opacity-40"
+                      style={{ color:'#0c1282' }}>
+                      <span className="material-symbols-outlined text-sm">add_circle</span>
+                      Browse all courses
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-4 flex items-center justify-center gap-2 text-sm" style={{ background:'#f2f4f6', color:'#464652' }}>
+                    <span className="material-symbols-outlined text-base" style={{ color: isPastView ? '#16a34a' : '#94a3b8' }}>
+                      {isPastView ? 'lock' : 'schedule'}
+                    </span>
+                    <span>
+                      {isPastView
+                        ? `${selSem} is completed — these courses are read-only.`
+                        : `${selSem} is upcoming — you can register it when it becomes your current semester.`}
+                      {' '}Switch back to{' '}
+                      <button onClick={() => setSelSem(currentSem)} className="font-bold underline" style={{ color:'#0c1282' }}>
+                        {currentSem}
+                      </button>{' '}to edit your registration.
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Citation block */}

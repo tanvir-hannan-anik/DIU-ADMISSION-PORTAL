@@ -34,6 +34,36 @@ class Config:
     RAG_TOP_K = int(os.getenv('RAG_TOP_K', '6'))
     RAG_MIN_SCORE = float(os.getenv('RAG_MIN_SCORE', '0.30'))
 
+    # ── AI Knowledge Pipeline (Phase 1+) ───────────────────────────────────
+    # Supabase / Postgres connection for the kb_* pipeline tables. The Python
+    # service reuses the same DB the Spring service uses. Blank → pipeline
+    # endpoints report "not configured" but the rest of the app keeps working.
+    DATABASE_URL = os.getenv('DATABASE_URL', '')
+
+    # Optional Redis for the KV/counter cache + scheduler locks. Blank → the
+    # cache falls back to an in-process dict and Postgres advisory locks.
+    REDIS_URL = os.getenv('REDIS_URL', '')
+
+    # Semantic cache (Layer 3) lives in a dedicated Qdrant collection.
+    QDRANT_SEMCACHE_COLLECTION = os.getenv('QDRANT_SEMCACHE_COLLECTION', 'diu_semcache')
+    SEMANTIC_CACHE_THRESHOLD = float(os.getenv('SEMANTIC_CACHE_THRESHOLD', '0.95'))
+
+    # Scheduler: in-process APScheduler (local) vs Render Cron Jobs (prod).
+    # Set SCHEDULER_ENABLED=false in prod and drive sync via cron → /pipeline/sync.
+    SCHEDULER_ENABLED = os.getenv('SCHEDULER_ENABLED', 'true').lower() in ('1', 'true', 'yes')
+    POPULAR_HIT_THRESHOLD = int(os.getenv('POPULAR_HIT_THRESHOLD', '10'))
+
+    # Per-category sync cadence overrides (seconds). Fall back to kb_sources
+    # seeded values when unset (0 = use DB value).
+    SYNC_ADMISSION_INTERVAL  = int(os.getenv('SYNC_ADMISSION_INTERVAL', '0'))
+    SYNC_NOTICE_INTERVAL     = int(os.getenv('SYNC_NOTICE_INTERVAL', '0'))
+    SYNC_FEES_INTERVAL       = int(os.getenv('SYNC_FEES_INTERVAL', '0'))
+    SYNC_DEPARTMENT_INTERVAL = int(os.getenv('SYNC_DEPARTMENT_INTERVAL', '0'))
+
+    # HTTP fetch tuning for the scraper/sync layer.
+    SCRAPE_TIMEOUT = int(os.getenv('SCRAPE_TIMEOUT', '20'))
+    SCRAPE_MAX_RETRIES = int(os.getenv('SCRAPE_MAX_RETRIES', '3'))
+
     FLASK_ENV = os.getenv('FLASK_ENV', 'development')
     SERVICE_HOST = os.getenv('SERVICE_HOST', '0.0.0.0')
     SERVICE_PORT = int(os.getenv('PORT', os.getenv('SERVICE_PORT', '5000')))

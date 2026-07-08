@@ -43,14 +43,36 @@ export const liveDataService = {
   },
 
   /**
-   * Fetch real-time faculty list scraped from faculty.daffodilvarsity.edu.bd.
-   * @param {boolean} force - bypass cache and re-scrape
+   * Official tuition-fee table (all programs) from Supabase — the 4 headline
+   * figures per program: Payable During Admission, Average Semester Fees,
+   * Total Tuition Fees, Total Program Fees. No scraping at request time, no tokens.
+   * Returns { success, data: { [faculty]: [ {program_name, ...4 fees...} ] }, count }.
    */
-  getFacultyList: async (force = false) => {
+  getTuitionFeeTable: async () => {
     try {
-      const url = API_ENDPOINTS.LIVE.FACULTY + (force ? '?force=1' : '');
-      const response = await aiApi.get(url);
-      return { success: true, data: response.data?.data };
+      const response = await aiApi.get(API_ENDPOINTS.LIVE.TUITION_TABLE);
+      return { success: true, data: response.data?.data || {}, count: response.data?.count || 0 };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message,
+      };
+    }
+  },
+
+  /**
+   * Fetch the complete, structured faculty directory from Supabase (kb_faculty).
+   * Served directly from the DB — no scraping at request time, no LLM tokens.
+   * Returns { success, data: { success, faculty:[{name, designation, department}], count } }.
+   */
+  getFacultyList: async () => {
+    try {
+      const response = await aiApi.get(API_ENDPOINTS.LIVE.FACULTY_DIRECTORY);
+      const faculty = response.data?.data || [];
+      return {
+        success: true,
+        data: { success: true, faculty, count: faculty.length },
+      };
     } catch (error) {
       return {
         success: false,

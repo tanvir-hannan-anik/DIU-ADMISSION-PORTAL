@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { formatBSTDate } from '../../utils/dateUtils';
+import AIPipelinePanel from './AIPipelinePanel';
 
 const ADMIN_EMAIL    = 'admin@diu.edu.bd';
 // Password is read from env at build time; falls back to a strong default.
@@ -236,6 +237,7 @@ export const AdminPanel = () => {
     { id: 'users',       label: 'Manage Users',      icon: 'group'                  },
     { id: 'requests',    label: 'Late Requests',     icon: 'pending_actions'        },
     { id: 'payments',    label: 'Payment Records',   icon: 'receipt_long'           },
+    { id: 'aipipeline',  label: 'AI Pipeline',       icon: 'smart_toy'              },
   ];
 
   return (
@@ -695,6 +697,8 @@ export const AdminPanel = () => {
               )}
             </div>
           )}
+
+          {tab === 'aipipeline' && <AIPipelinePanel />}
 
         </main>
       </div>

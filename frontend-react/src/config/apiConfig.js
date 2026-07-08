@@ -22,6 +22,8 @@ export const API_ENDPOINTS = {
     TUITION_FEES:    '/api/v1/live/tuition-fees',
     FACULTY:         '/api/v1/live/faculty',
     FACULTY_PROFILE: '/api/v1/live/faculty/profile',
+    FACULTY_DIRECTORY: '/api/v1/faculty/flat',   // structured, from Supabase (no tokens)
+    TUITION_TABLE:   '/api/v1/tuition-fees',     // official 4-value fee table (no tokens)
     REFRESH:         '/api/v1/live/refresh',
     REFRESH_RAG:     '/api/v1/live/refresh-rag',
   },

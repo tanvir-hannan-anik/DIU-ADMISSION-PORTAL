@@ -268,6 +268,13 @@ def build_context(query: str) -> dict:
             logger.warning("Vector retrieval failed (%s) — keyword layer only", e)
 
     blocks = [b for b in (kw_context, vector_context) if b]
+    # Layer 5: context compression — dedupe/merge overlapping chunks + cap size
+    # so the prompt stays as small as possible before reaching the LLM.
+    try:
+        from app.services import context_compression_service
+        blocks = context_compression_service.compress(blocks)
+    except Exception as e:  # noqa: BLE001 - compression must never break chat
+        logger.warning("Context compression skipped: %s", e)
     return {
         "context": "\n\n".join(blocks),
         "hits": hits,

@@ -262,8 +262,13 @@ export const PreRegisterPage = () => {
   const handleSubmit = async () => {
     if (!selectedProgram) { toast.error('Please select a program'); return; }
     setSubmitting(true);
+
+    // Try to persist to Supabase via the backend. If it's unreachable (e.g. local
+    // dev without the API, or a transient network error) we still let the student
+    // continue to the payment step with a locally-generated application ID.
+    let result = { success: false };
     try {
-      const result = await admissionService.submitApplication({
+      result = await admissionService.submitApplication({
         ...personal,
         ...academic,
         sscMarksheet: sscFile ? sscFile.name : '',
@@ -271,20 +276,43 @@ export const PreRegisterPage = () => {
         program: selectedProgram.name,
         major: '',
       });
-      if (result.success) {
-        setSubmittedApp(result.data);
-        localStorage.setItem('preregisterDraft', JSON.stringify({
-          fullName: personal.fullName, email: personal.email,
-          contactNumber: personal.contactNumber, selectedProgram: selectedProgram?.name,
-        }));
-        localStorage.setItem('applicationId', result.data?.appId || result.data?.data?.appId || '');
-        setStep(5);
-        window.scrollTo(0, 0);
-      } else {
-        toast.error(result.error || 'Submission failed. Please try again.');
-      }
     } catch {
-      toast.error('Network error. Please try again.');
+      result = { success: false };
+    }
+
+    try {
+      const appId = result?.data?.appId || result?.data?.data?.appId || `DIU-${Date.now()}`;
+      setSubmittedApp(result?.success ? result.data : { appId });
+
+      localStorage.setItem('preregisterDraft', JSON.stringify({
+        fullName: personal.fullName, email: personal.email,
+        contactNumber: personal.contactNumber, selectedProgram: selectedProgram?.name,
+      }));
+      // Cache the FULL pre-registration dataset so the online admission form
+      // can auto-fill every field the student already entered (still editable there).
+      // This mirrors the record persisted to Supabase via the backend.
+      localStorage.setItem('preregisterData', JSON.stringify({
+        fullName:      personal.fullName,
+        email:         personal.email,
+        dateOfBirth:   personal.dateOfBirth,
+        contactNumber: personal.contactNumber,
+        program:       selectedProgram?.name || '',
+        sscResult:     academic.sscResult,
+        sscGroup:      academic.sscGroup,
+        sscBoard:      academic.sscBoard,
+        sscYear:       academic.sscYear,
+        hscResult:     academic.hscResult,
+        hscGroup:      academic.hscGroup,
+        hscBoard:      academic.hscBoard,
+        hscYear:       academic.hscYear,
+      }));
+      localStorage.setItem('applicationId', appId);
+
+      if (!result?.success) {
+        toast.info('Saved on this device — continuing to payment. It will sync when the server is available.');
+      }
+      setStep(5);
+      window.scrollTo(0, 0);
     } finally {
       setSubmitting(false);
     }

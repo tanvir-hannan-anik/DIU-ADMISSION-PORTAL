@@ -50,12 +50,20 @@ def process_prompt():
 
         logger.info(f"Processing prompt for user: {user_id}, module: {module_type}")
 
-        result = groq_service.process_prompt(
-            prompt=prompt,
-            context=context,
-            module_type=module_type,
-            history=history
-        )
+        # Route through the 6-layer token-optimization pipeline (intent → FAQ →
+        # semantic cache → RAG → compression → LLM). Falls back to a direct LLM
+        # call if the pipeline module is unavailable for any reason.
+        try:
+            from app.services import chat_pipeline_service
+            result = chat_pipeline_service.answer(
+                groq_service, prompt=prompt, context=context,
+                module_type=module_type, history=history, user_id=user_id,
+            )
+        except Exception as e:  # noqa: BLE001 - never break chat on pipeline error
+            logger.warning("Chat pipeline unavailable (%s) — direct LLM call", e)
+            result = groq_service.process_prompt(
+                prompt=prompt, context=context, module_type=module_type, history=history
+            )
 
         return jsonify(result), 200
 

@@ -1,0 +1,39 @@
+name: DIU AI Knowledge Sync
+
+# Free, off-Render production scheduler. Runs every 15 minutes and syncs only
+# the sources whose own interval has elapsed (run_due), so the Render web dyno
+# never has to run the scheduler or a headless browser. Writes go straight to
+# Supabase + Qdrant, which the web service reads.
+on:
+  schedule:
+    - cron: "*/15 * * * *"     # every 15 minutes (GitHub cron min granularity 5m)
+  workflow_dispatch: {}          # allow manual runs
+
+concurrency:
+  group: kb-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies (+ Chromium for JS sources)
+        run: |
+          pip install -r requirements.txt -r requirements-worker.txt
+          playwright install --with-deps chromium
+      - name: Run due syncs
+        env:
+          DATABASE_URL:   ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          QDRANT_URL:     ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          QDRANT_COLLECTION: diu_kb
+          QDRANT_SEMCACHE_COLLECTION: diu_semcache
+        run: python scripts/run_scheduled_sync.py

@@ -14,14 +14,17 @@ answer leadership / faculty / eligibility questions consistently.
 SEED_DOCS: list[dict] = [
     {
         "id": "seed-leadership",
-        "title": "University Leadership (VC, Founder, Pro-VC)",
+        "title": "University Leadership (Chancellor, VC, Founder, Pro-VC)",
         "type": "leadership",
         "department": "",
         "text": (
             "Daffodil International University (DIU) leadership — always report exactly this:\n"
-            "- Founder & Chairman: Dr. Md. Sabur Khan\n"
-            "- Vice Chancellor: Professor Dr. M. R. Kabir\n"
-            "- Pro-Vice Chancellor: Professor Mohammed Masum Iqbal, PhD"
+            "- Founder & Chairman: Dr. Md. Sabur Khan (Founder & Chairman, Daffodil Family)\n"
+            "- Chancellor: Mohammed Shahabuddin — Hon'ble President of the People's Republic of "
+            "Bangladesh and Hon'ble Chancellor, Daffodil International University\n"
+            "- Vice Chancellor: Professor Dr. M. R. Kabir (Vice Chancellor, Daffodil International University)\n"
+            "- Pro Vice Chancellor: Professor Mohammed Masum Iqbal, PhD (Pro Vice Chancellor, "
+            "Daffodil International University)"
         ),
     },
     {

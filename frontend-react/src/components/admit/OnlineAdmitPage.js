@@ -5,6 +5,7 @@ import { Footer } from '../common/Footer';
 import { ChatbotWidget } from '../common/ChatbotWidget';
 import { toast } from 'react-toastify';
 import API_CONFIG from '../../config/apiConfig';
+import { admissionService } from '../../services/admissionService';
 
 // ── Constants ──────────────────────────────────────────────────────
 const DIVISIONS = ['Dhaka', 'Chittagong', 'Rajshahi', 'Sylhet', 'Barisal', 'Khulna', 'Rangpur', 'Mymensingh'];
@@ -322,6 +323,55 @@ export const OnlineAdmitPage = () => {
     window.addEventListener('chatbot-form-fill', handler);
     return () => window.removeEventListener('chatbot-form-fill', handler);
   }, [applyChatbotAdmitData]);
+
+  // ── Pre-registration auto-fill ──────────────────────────────────
+  // Fill the admission form with the data the student entered during
+  // pre-registration. Only empty fields are filled, so any value the
+  // student edits (or the localStorage draft already populated) is kept —
+  // everything stays fully editable.
+  const applyPreRegistrationPrefill = useCallback((src) => {
+    if (!src) return;
+    const val = (v) => (v === undefined || v === null ? '' : String(v));
+    setPersonal(prev => ({
+      ...prev,
+      fullName: prev.fullName || val(src.fullName),
+      dob:      prev.dob      || val(src.dateOfBirth ?? src.dob),
+      phone:    prev.phone    || val(src.contactNumber ?? src.phone),
+      email:    prev.email    || val(src.email),
+    }));
+    setAcademic(prev => ({
+      ...prev,
+      sscGpa:   prev.sscGpa   || val(src.sscResult ?? src.sscGpa),
+      sscGroup: prev.sscGroup || val(src.sscGroup),
+      sscBoard: prev.sscBoard || val(src.sscBoard),
+      sscYear:  prev.sscYear  || val(src.sscYear),
+      hscGpa:   prev.hscGpa   || val(src.hscResult ?? src.hscGpa),
+      hscGroup: prev.hscGroup || val(src.hscGroup),
+      hscBoard: prev.hscBoard || val(src.hscBoard),
+      hscYear:  prev.hscYear  || val(src.hscYear),
+    }));
+    setProgram(prev => ({
+      ...prev,
+      programName: prev.programName || val(src.program ?? src.programName),
+    }));
+  }, []);
+
+  useEffect(() => {
+    // 1. Instant pre-fill from the locally cached pre-registration dataset.
+    const local = JSON.parse(localStorage.getItem('preregisterData') || 'null');
+    if (local) applyPreRegistrationPrefill(local);
+
+    // 2. Authoritative pre-fill from Supabase (via backend) using the stored
+    //    application ID from pre-registration. Skips the random client-only
+    //    fallback ID ("DIU-2025-####") which never exists in the database.
+    const savedAppId = localStorage.getItem('applicationId');
+    if (savedAppId && !/^DIU-2025-/.test(savedAppId)) {
+      admissionService.getApplicationById(savedAppId)
+        .then(res => { if (res.success && res.data) applyPreRegistrationPrefill(res.data); })
+        .catch(() => { /* backend unavailable — local cache already applied */ });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applyPreRegistrationPrefill]);
 
   // ── Dashboard handlers ──
   const triggerDashUpload = (docId) => { setDashTarget(docId); dashFileRef.current.click(); };

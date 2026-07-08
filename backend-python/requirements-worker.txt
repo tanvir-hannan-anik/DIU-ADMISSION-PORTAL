@@ -1,0 +1,10 @@
+# ── JS-render sync worker deps (OFF-Render only) ──────────────────────────────
+# Install these ONLY where the JavaScript-rendering sync actually runs — your
+# local machine, a GitHub Actions cron, or a dedicated worker. They are kept out
+# of requirements.txt so the always-on Render web dyno stays light.
+#
+#   pip install -r requirements.txt -r requirements-worker.txt
+#   playwright install chromium
+#
+-r requirements.txt
+playwright>=1.44.0

@@ -133,6 +133,41 @@ export const getEnrollmentBySemester = (email, semester) => {
   } catch { return null; }
 };
 
+// ── Current semester resolution ─────────────────────────────────────────────────
+// Used by Course Registration & Late Registration to auto-load the courses that
+// belong to the student's current semester. Priority:
+//   1. The semester saved on the student's profile (manually set / synced from DB)
+//   2. An estimate derived from the student ID (mirrors ProfilePage's logic)
+//   3. A sensible fallback
+
+const SEMESTER_KEYS = Array.from({ length: 12 }, (_, i) => `Semester ${i + 1}`);
+
+// Estimate the current semester number from a DIU student ID (e.g. "221-15-4906").
+// batchPart "221" → year "22", intake "1"; ~6 months per semester. Capped like ProfilePage.
+function estimateSemesterFromId(studentId) {
+  if (!studentId) return null;
+  const parts = String(studentId).split('-');
+  if (parts.length < 2 || parts[0].length < 3) return null;
+  const year      = parseInt('20' + parts[0].slice(0, 2), 10);
+  const intakeNum = parts[0].slice(2);
+  if (isNaN(year)) return null;
+  const enrolledMonth = intakeNum === '2' ? 4 : intakeNum === '3' ? 8 : 0;
+  const now    = new Date();
+  const months = Math.max(0, (now.getFullYear() - year) * 12 + (now.getMonth() - enrolledMonth));
+  const semNumber = Math.min(8, Math.floor(months / 6) + 1);
+  return `Semester ${semNumber}`;
+}
+
+export const getCurrentSemesterKey = (email, fallback = 'Semester 5') => {
+  try {
+    const profile = JSON.parse(localStorage.getItem(`diu_profile_${email}`) || '{}');
+    if (SEMESTER_KEYS.includes(profile.currentSemester)) return profile.currentSemester;
+    const est = estimateSemesterFromId(profile.studentId);
+    if (est && SEMESTER_KEYS.includes(est)) return est;
+  } catch {}
+  return fallback;
+};
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function parseJson(str, fallback) {

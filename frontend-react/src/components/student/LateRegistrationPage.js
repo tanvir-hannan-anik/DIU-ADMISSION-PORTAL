@@ -5,7 +5,8 @@ import { toast } from 'react-toastify';
 import { SmartAdvisorFullscreen } from './SmartAdvisorFullscreen';
 import API_CONFIG from '../../config/apiConfig';
 import axios from 'axios';
-import { saveLateRegistration } from '../../services/studentDataService';
+import { saveLateRegistration, getCurrentSemesterKey } from '../../services/studentDataService';
+import { completedCourseCodes } from './CompletedCoursesPanel';
 
 const DIU_NOTIFICATIONS = [
   { id:1, icon:'warning',       title:'Late Registration Open',    body:'Submit your late registration before the deadline', time:'Just now', unread:true,  color:'#ba1a1a' },
@@ -219,9 +220,12 @@ export const LateRegistrationPage = () => {
   const SEMESTER_DATA = getSemesterData();
   const countdown   = useCountdown(adminConfig.lateRegistrationEnd || '2026-04-30T23:59:59');
 
-  // course state
-  const [selSem,   setSelSem]   = useState('Semester 5');
-  const [cart,     setCart]     = useState([]);
+  // course state — auto-load the courses assigned to the student's current semester
+  const currentSem = getCurrentSemesterKey(user?.email);
+  const [selSem,   setSelSem]   = useState(currentSem);
+  const [cart,     setCart]     = useState(() =>
+    (SEMESTER_DATA[currentSem] || []).map(course => ({ course, type: 'regular' }))
+  );
   const [checked,  setChecked]  = useState({});
   const [allChk,   setAllChk]   = useState(false);
   const [showPicker,    setShowPicker]    = useState(false);
@@ -360,6 +364,19 @@ export const LateRegistrationPage = () => {
   const cartCodes = cart.map(c => c.course.course_code);
   const available = SEMESTER_DATA[selSem] ?? [];
   const allCourses = Object.values(SEMESTER_DATA).flat();
+
+  // ── Semester view (driven by the "View semester" dropdown) ──────────────────
+  // Table shows the chosen semester's courses: current = editable registration,
+  // a PAST semester = read-only "Completed", a FUTURE one = read-only "Upcoming".
+  const orderedKeys   = [...Object.keys(SEMESTER_DATA)].sort(
+    (a, b) => (parseInt(String(a).replace(/\D/g, ''), 10) || 0) - (parseInt(String(b).replace(/\D/g, ''), 10) || 0));
+  const currentIdx    = orderedKeys.indexOf(currentSem);
+  const viewIdx       = orderedKeys.indexOf(selSem);
+  const isCurrentView = selSem === currentSem;
+  const isPastView    = viewIdx > -1 && currentIdx > -1 && viewIdx < currentIdx;
+  const viewCourses   = isCurrentView
+    ? cart
+    : (SEMESTER_DATA[selSem] || []).map(course => ({ course, type: isPastView ? 'completed' : 'upcoming' }));
 
   const paymentEnabled = step === 6;
   const paymentDone    = step >= 7;
@@ -532,7 +549,12 @@ YOUR ROLE
   };
   const sendChat = () => sendChatText(chatInput.trim());
 
-  const pickerList = allCourses.filter(c =>
+  // Retake requests can only be for courses from PREVIOUS (completed) semesters.
+  const currentCompletedCodes = completedCourseCodes(SEMESTER_DATA, Object.keys(SEMESTER_DATA), currentSem);
+  const pickerSource = pickerType === 'retake'
+    ? allCourses.filter(c => currentCompletedCodes.has(c.course_code))
+    : allCourses;
+  const pickerList = pickerSource.filter(c =>
     !cartCodes.includes(c.course_code) &&
     (c.course_code.toLowerCase().includes(pickerSearch.toLowerCase()) || c.subject.toLowerCase().includes(pickerSearch.toLowerCase()))
   );
@@ -821,17 +843,39 @@ YOUR ROLE
                 </div>
               </div>
 
+              {/* Auto-load notice */}
+              {step === 1 && (
+                <div className="flex items-start gap-2 text-sm px-1" style={{ color:'#464652' }}>
+                  <span className="material-symbols-outlined text-base" style={{ color:'#ba1a1a' }}>auto_awesome</span>
+                  <span>
+                    Courses for your current semester (<strong style={{ color:'#000155' }}>{currentSem}</strong>) are loaded automatically.
+                    Use <strong style={{ color:'#000155' }}>View semester</strong> to browse any semester — courses from a completed
+                    semester are shown as <strong style={{ color:'#15803d' }}>Completed</strong> and are read-only.
+                  </span>
+                </div>
+              )}
+
               {/* Semester selector + action buttons */}
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
-                  <label className="text-sm font-bold" style={{ color:'#464652' }}>Semester:</label>
+                  <label className="text-sm font-bold" style={{ color:'#464652' }}>View semester:</label>
                   <select value={selSem} onChange={e => setSelSem(e.target.value)} disabled={step > 1}
                     className="border rounded-lg px-3 py-1.5 text-sm font-semibold outline-none"
                     style={{ background:'white', borderColor:'#c6c5d4', color:'#191c1e' }}>
-                    {Object.keys(SEMESTER_DATA).map(s => <option key={s} value={s}>{s}</option>)}
+                    {orderedKeys.map(s => {
+                      const idx = orderedKeys.indexOf(s);
+                      const tag = s === currentSem ? ' — Current' : (idx < currentIdx ? ' — Completed' : ' — Upcoming');
+                      return <option key={s} value={s}>{s}{tag}</option>;
+                    })}
                   </select>
+                  {!isCurrentView && (
+                    <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full"
+                          style={{ background: isPastView ? '#dcfce7' : '#fef3c7', color: isPastView ? '#15803d' : '#92400e' }}>
+                      {isPastView ? 'Completed · read-only' : 'Upcoming · read-only'}
+                    </span>
+                  )}
                 </div>
-                {step === 1 && (
+                {step === 1 && isCurrentView && (
                   <div className="flex gap-2">
                     <button onClick={() => { setPickerType('retake'); setPickerSearch(''); setShowPicker(true); }}
                       className="text-xs font-bold px-4 py-2 rounded-lg border transition-colors"
@@ -855,20 +899,26 @@ YOUR ROLE
               <div className="rounded-xl overflow-hidden shadow-sm" style={{ background:'white' }}>
                 <div className="p-5 flex justify-between items-center" style={{ borderBottom:'1px solid #e6e8ea' }}>
                   <h3 className="font-bold" style={{ color:'#000155' }}>
-                    Selected Courses
-                    <span className="ml-2 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background:'#ffdad6', color:'#ba1a1a' }}>
-                      {cart.length}
+                    {isCurrentView ? 'Selected Courses' : `${selSem} Courses`}
+                    <span className="ml-2 text-xs font-bold px-2 py-0.5 rounded-full"
+                          style={{ background: isCurrentView ? '#ffdad6' : isPastView ? '#dcfce7' : '#fef3c7',
+                                   color: isCurrentView ? '#ba1a1a' : isPastView ? '#15803d' : '#92400e' }}>
+                      {viewCourses.length}
                     </span>
                   </h3>
-                  <span className="text-xs font-bold" style={{ color:'#464652' }}>{fees.totalCr} credits</span>
+                  <span className="text-xs font-bold" style={{ color:'#464652' }}>
+                    {isCurrentView ? `${fees.totalCr} credits` : `${viewCourses.reduce((s, c) => s + c.course.credits, 0)} credits`}
+                  </span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead style={{ background:'#f2f4f6' }}>
                       <tr>
                         <th className="p-4 w-12">
-                          <input type="checkbox" checked={allChk} onChange={toggleAll}
-                            className="rounded" style={{ accentColor:'#ba1a1a' }} />
+                          {isCurrentView && (
+                            <input type="checkbox" checked={allChk} onChange={toggleAll}
+                              className="rounded" style={{ accentColor:'#ba1a1a' }} />
+                          )}
                         </th>
                         {['Code','Course Name','Credits','Type','Status',''].map(h => (
                           <th key={h} className="p-4 text-[11px] font-bold uppercase tracking-wider" style={{ color:'#464652' }}>{h}</th>
@@ -876,43 +926,65 @@ YOUR ROLE
                       </tr>
                     </thead>
                     <tbody>
-                      {cart.length === 0 ? (
+                      {viewCourses.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="py-14 text-center text-sm" style={{ color:'#767684' }}>
                             <span className="material-symbols-outlined text-4xl block mb-2" style={{ color:'#c6c5d4' }}>playlist_add</span>
-                            No courses selected. Use the semester selector above or browse all courses.
+                            No courses in your registration. Add a retake/drop, or browse all courses.
                           </td>
                         </tr>
-                      ) : cart.map(({ course, type }) => (
-                        <tr key={course.course_code} className="transition-colors" style={{ borderBottom:'1px solid #e6e8ea' }}
-                          onMouseEnter={e => e.currentTarget.style.background='#f7f9fb'}
-                          onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                      ) : viewCourses.map(({ course, type }) => {
+                        const readOnly = !isCurrentView;
+                        return (
+                        <tr key={course.course_code} className="transition-colors"
+                          style={{ borderBottom:'1px solid #e6e8ea', background: readOnly ? '#fbfcfd' : 'transparent' }}
+                          onMouseEnter={e => e.currentTarget.style.background = readOnly ? '#f6f8fa' : '#f7f9fb'}
+                          onMouseLeave={e => e.currentTarget.style.background = readOnly ? '#fbfcfd' : 'transparent'}>
                           <td className="p-4">
-                            <input type="checkbox" checked={!!checked[course.course_code]} onChange={() => toggleCheck(course.course_code)}
-                              className="rounded" style={{ accentColor:'#ba1a1a' }} />
+                            {readOnly ? (
+                              <span className="material-symbols-outlined text-lg"
+                                    style={{ color: isPastView ? '#16a34a' : '#94a3b8', fontVariationSettings:"'FILL' 1" }}>
+                                {isPastView ? 'check_circle' : 'schedule'}
+                              </span>
+                            ) : (
+                              <input type="checkbox" checked={!!checked[course.course_code]} onChange={() => toggleCheck(course.course_code)}
+                                className="rounded" style={{ accentColor:'#ba1a1a' }} />
+                            )}
                           </td>
                           <td className="p-4 font-mono text-sm font-bold" style={{ color:'#0c1282' }}>{course.course_code}</td>
                           <td className="p-4 font-bold text-sm max-w-xs truncate" style={{ color:'#191c1e' }}>{course.subject}</td>
                           <td className="p-4 text-center text-sm" style={{ color:'#191c1e' }}>{course.credits}</td>
                           <td className="p-4">
-                            <select value={type} onChange={e => changeType(course.course_code, e.target.value)}
-                              disabled={step > 1}
-                              className="text-xs font-semibold border rounded px-2 py-1 outline-none"
-                              style={{ borderColor:'#c6c5d4', background:'#f7f9fb', color: type==='retake'?'#b45309': type==='drop'?'#ba1a1a':'#191c1e' }}>
-                              <option value="regular">Regular</option>
-                              <option value="retake">Retake</option>
-                              <option value="drop">Drop</option>
-                            </select>
+                            {readOnly ? (
+                              <span className="text-xs font-bold px-2 py-1 rounded"
+                                    style={{ background: isPastView ? '#dcfce7' : '#fef3c7', color: isPastView ? '#15803d' : '#92400e' }}>
+                                {isPastView ? 'Completed' : 'Upcoming'}
+                              </span>
+                            ) : (
+                              <select value={type} onChange={e => changeType(course.course_code, e.target.value)}
+                                disabled={step > 1}
+                                className="text-xs font-semibold border rounded px-2 py-1 outline-none"
+                                style={{ borderColor:'#c6c5d4', background:'#f7f9fb', color: type==='retake'?'#b45309': type==='drop'?'#ba1a1a':'#191c1e' }}>
+                                <option value="regular">Regular</option>
+                                <option value="retake">Retake</option>
+                                <option value="drop">Drop</option>
+                              </select>
+                            )}
                           </td>
                           <td className="p-4">
-                            {complete
+                            {readOnly
+                              ? <span className="px-2 py-1 rounded-md text-[10px] font-bold uppercase"
+                                      style={{ background: isPastView ? '#dcfce7' : '#f2f4f6', color: isPastView ? '#15803d' : '#464652' }}>
+                                  {isPastView ? 'Passed' : 'Not started'}
+                                </span>
+                              : complete
                               ? <span className="px-2 py-1 rounded-md text-[10px] font-bold uppercase" style={{ background:'#d5e3fc', color:'#0d1c2e' }}>Approved</span>
                               : paymentDone
                               ? <span className="px-2 py-1 rounded-md text-[10px] font-bold uppercase" style={{ background:'#fef3c7', color:'#92400e' }}>Processing</span>
                               : <span className="px-2 py-1 rounded-md text-[10px] font-bold uppercase" style={{ background:'#ffdad6', color:'#ba1a1a' }}>Late Reg</span>}
                           </td>
                           <td className="p-4">
-                            {step === 1 && (
+                            {step === 1 && !readOnly && (
                               <button onClick={() => removeCourse(course.course_code)} style={{ color:'#767684' }}
                                 onMouseEnter={e => e.currentTarget.style.color='#ba1a1a'}
                                 onMouseLeave={e => e.currentTarget.style.color='#767684'}>
@@ -921,32 +993,50 @@ YOUR ROLE
                             )}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
 
-                {/* Quick-add row */}
-                <div className="p-4 flex flex-wrap gap-2" style={{ background:'#f2f4f6' }}>
-                  {available.filter(c => !cartCodes.includes(c.course_code)).slice(0, 4).map(course => (
-                    <button key={course.course_code} disabled={step > 1}
-                      onClick={() => addCourse(course)}
-                      className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg transition-all disabled:opacity-40"
-                      style={{ color:'#ba1a1a', background:'#ffdad6' }}
-                      onMouseEnter={e => { e.currentTarget.style.background='#ffc4c4'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background='#ffdad6'; }}>
+                {/* Quick-add row — only when registering the current semester */}
+                {isCurrentView ? (
+                  <div className="p-4 flex flex-wrap gap-2" style={{ background:'#f2f4f6' }}>
+                    {available.filter(c => !cartCodes.includes(c.course_code)).slice(0, 4).map(course => (
+                      <button key={course.course_code} disabled={step > 1}
+                        onClick={() => addCourse(course)}
+                        className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg transition-all disabled:opacity-40"
+                        style={{ color:'#ba1a1a', background:'#ffdad6' }}
+                        onMouseEnter={e => { e.currentTarget.style.background='#ffc4c4'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background='#ffdad6'; }}>
+                        <span className="material-symbols-outlined text-sm">add_circle</span>
+                        {course.course_code}
+                      </button>
+                    ))}
+                    <button onClick={() => { setPickerType('regular'); setPickerSearch(''); setShowPicker(true); }}
+                      disabled={step > 1}
+                      className="flex items-center gap-2 text-sm font-bold hover:underline disabled:opacity-40"
+                      style={{ color:'#0c1282' }}>
                       <span className="material-symbols-outlined text-sm">add_circle</span>
-                      {course.course_code}
+                      Browse all courses
                     </button>
-                  ))}
-                  <button onClick={() => { setPickerType('regular'); setPickerSearch(''); setShowPicker(true); }}
-                    disabled={step > 1}
-                    className="flex items-center gap-2 text-sm font-bold hover:underline disabled:opacity-40"
-                    style={{ color:'#0c1282' }}>
-                    <span className="material-symbols-outlined text-sm">add_circle</span>
-                    Browse all courses
-                  </button>
-                </div>
+                  </div>
+                ) : (
+                  <div className="p-4 flex items-center justify-center gap-2 text-sm" style={{ background:'#f2f4f6', color:'#464652' }}>
+                    <span className="material-symbols-outlined text-base" style={{ color: isPastView ? '#16a34a' : '#94a3b8' }}>
+                      {isPastView ? 'lock' : 'schedule'}
+                    </span>
+                    <span>
+                      {isPastView
+                        ? `${selSem} is completed — these courses are read-only.`
+                        : `${selSem} is upcoming — register it when it becomes your current semester.`}
+                      {' '}Switch back to{' '}
+                      <button onClick={() => setSelSem(currentSem)} className="font-bold underline" style={{ color:'#0c1282' }}>
+                        {currentSem}
+                      </button>{' '}to edit your registration.
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* ── Justification form (step 1) ──────────────────────────────── */}

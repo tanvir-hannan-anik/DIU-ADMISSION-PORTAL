@@ -82,7 +82,7 @@ export const FacultyPage = () => {
   const [liveLoading,    setLiveLoading]     = useState(true);
   const [liveError,      setLiveError]       = useState('');
   const [liveRefreshing, setLiveRefreshing]  = useState(false);
-  const [showLive,       setShowLive]        = useState(false);
+  const [showLive,       setShowLive]        = useState(true);
   const [liveSearch,     setLiveSearch]      = useState('');
   const [expandedProfile, setExpandedProfile] = useState(null);
 

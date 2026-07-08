@@ -2,6 +2,112 @@ import React, { useState, useEffect } from 'react';
 import { Navigation } from '../common/Navigation';
 import { liveDataService } from '../../services/liveDataService';
 
+/* ─── Official Tuition Fees table (all programs, all departments) ───────────
+   Shows the 4 headline figures per program straight from Supabase
+   (kb_tuition_fees, sourced from daffodilvarsity.edu.bd/tuition-fees).
+   No LLM tokens — pure DB read. */
+function OfficialFeeTable() {
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState('');
+  const [q, setQ]             = useState('');
+
+  useEffect(() => {
+    liveDataService.getTuitionFeeTable().then(res => {
+      setLoading(false);
+      if (res.success) setData(res.data);
+      else setError(res.error || 'Could not load tuition fees');
+    });
+  }, []);
+
+  const money = v => (v && String(v).trim() ? `BDT ${v}` : '—');
+  const matches = row => {
+    if (!q) return true;
+    const s = q.toLowerCase();
+    return (row.program_name || '').toLowerCase().includes(s) ||
+           (row.department_name || '').toLowerCase().includes(s);
+  };
+  const faculties = data ? Object.keys(data) : [];
+  const totalPrograms = faculties.reduce((n, f) => n + (data[f] || []).length, 0);
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+        <div>
+          <h2 className="text-xl font-bold text-[#0c1282]">Official Tuition Fees — All Programs</h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Live figures from{' '}
+            <a href="https://daffodilvarsity.edu.bd/tuition-fees" target="_blank" rel="noopener noreferrer"
+              className="text-[#0c1282] underline underline-offset-2">daffodilvarsity.edu.bd/tuition-fees</a>
+          </p>
+        </div>
+        {data && (
+          <div className="relative">
+            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-base">search</span>
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search program / department…"
+              className="pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0c1282]/30 w-64 max-w-full" />
+          </div>
+        )}
+      </div>
+
+      {loading && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
+          <div className="inline-block w-6 h-6 border-2 border-[#0c1282] border-t-transparent rounded-full animate-spin mb-3" />
+          <p className="text-xs text-gray-400">Loading official tuition fees…</p>
+        </div>
+      )}
+      {!loading && error && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm text-amber-700">{error}</div>
+      )}
+
+      {!loading && data && faculties.map(fac => {
+        const rows = (data[fac] || []).filter(matches);
+        if (rows.length === 0) return null;
+        return (
+          <div key={fac} className="mb-6">
+            <h3 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-base text-[#0c1282]">school</span>
+              Faculty of {fac}
+              <span className="text-xs font-normal text-gray-400">({rows.length})</span>
+            </h3>
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-[#0c1282]/5 border-b border-gray-200">
+                    <tr>
+                      {['Program', 'Payable During Admission', 'Average Semester Fees', 'Total Tuition Fees', 'Total Program Fees'].map(h => (
+                        <th key={h} className="px-4 py-2.5 text-left text-xs font-bold text-[#0c1282] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {rows.map((r, i) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-gray-800">{r.program_name}</div>
+                          <div className="text-xs text-gray-400">{r.program_type} · {r.credit} credits · {r.duration}</div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-700">{money(r.payable_admission)}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-700">{money(r.avg_semester_fee)}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-700">{money(r.total_tuition_fee)}</td>
+                        <td className="px-4 py-3 whitespace-nowrap font-bold text-[#0c1282]">{money(r.total_program_fee)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {!loading && data && totalPrograms > 0 && (
+        <p className="text-xs text-gray-400 mt-1">{totalPrograms} programs · figures in BDT. Waiver applies to tuition fee only.</p>
+      )}
+    </section>
+  );
+}
+
 /* ─── Waiver logic (from official waiver-policy2025.pdf) ─────── */
 // "Golden GPA-5" = GPA 5.00 with A+ in ALL subjects (including 4th subject)
 // "GPA-5"        = GPA 5.00 (may have A, not all A+)
@@ -446,6 +552,9 @@ export const ScholarshipPage = () => {
             </div>
           </div>
         </section>
+
+        {/* ── Official Tuition Fees — all programs, 4 values each ── */}
+        <OfficialFeeTable />
 
         {/* ── Live Scholarship Data from DIU Website ── */}
         <section>
