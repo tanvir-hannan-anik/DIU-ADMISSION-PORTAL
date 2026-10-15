@@ -5,9 +5,10 @@ from app.services import rag_service
 from app.config.settings import Config
 
 logger = logging.getLogger(__name__)
-bp = Blueprint('ai', __name__, url_prefix='/api/v1/ai')
+bp = Blueprint("ai", __name__, url_prefix="/api/v1/ai")
 
 _groq_service = None
+
 
 def get_groq_service():
     global _groq_service
@@ -15,38 +16,61 @@ def get_groq_service():
         try:
             _groq_service = GroqService()
             logger.info("Groq service initialized")
-        except (ValueError, Exception) as e:
+        except Exception as e:
             logger.error(f"Groq service init failed: {e}")
             return None
     return _groq_service
 
 
-@bp.route('/process', methods=['POST'])
+@bp.route("/process", methods=["POST"])
 def process_prompt():
     try:
         data = request.get_json()
 
-        if not data or not data.get('prompt'):
-            return jsonify({'success': False, 'message': 'Prompt is required', 'errorCode': 'VALIDATION_ERROR'}), 400
+        if not data or not data.get("prompt"):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Prompt is required",
+                        "errorCode": "VALIDATION_ERROR",
+                    }
+                ),
+                400,
+            )
 
-        prompt = data.get('prompt', '').strip()
+        prompt = data.get("prompt", "").strip()
         # Allow short keyword messages like "Ai", "ML", "CE" — the keyword layer
         # resolves these to relevant departments. Only reject empty / 1-char noise.
         if len(prompt) < 2:
-            return jsonify({'success': False, 'message': 'Prompt too short', 'errorCode': 'VALIDATION_ERROR'}), 400
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Prompt too short",
+                        "errorCode": "VALIDATION_ERROR",
+                    }
+                ),
+                400,
+            )
 
         groq_service = get_groq_service()
         if groq_service is None:
-            return jsonify({
-                'success': False,
-                'message': 'AI service not configured. Check GROQ_API_KEY in .env file.',
-                'errorCode': 'SERVICE_NOT_CONFIGURED'
-            }), 503
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "AI service not configured. Check GROQ_API_KEY in .env file.",
+                        "errorCode": "SERVICE_NOT_CONFIGURED",
+                    }
+                ),
+                503,
+            )
 
-        context = data.get('context', '')
-        module_type = data.get('moduleType', 'general')
-        user_id = data.get('userId', 'anonymous')
-        history = data.get('history', [])
+        context = data.get("context", "")
+        module_type = data.get("moduleType", "general")
+        user_id = data.get("userId", "anonymous")
+        history = data.get("history", [])
 
         logger.info(f"Processing prompt for user: {user_id}, module: {module_type}")
 
@@ -55,9 +79,14 @@ def process_prompt():
         # call if the pipeline module is unavailable for any reason.
         try:
             from app.services import chat_pipeline_service
+
             result = chat_pipeline_service.answer(
-                groq_service, prompt=prompt, context=context,
-                module_type=module_type, history=history, user_id=user_id,
+                groq_service,
+                prompt=prompt,
+                context=context,
+                module_type=module_type,
+                history=history,
+                user_id=user_id,
             )
         except Exception as e:  # noqa: BLE001 - never break chat on pipeline error
             logger.warning("Chat pipeline unavailable (%s) — direct LLM call", e)
@@ -68,46 +97,85 @@ def process_prompt():
         return jsonify(result), 200
 
     except RuntimeError as e:
-        logger.error(f"AI processing error: {str(e)}")
-        return jsonify({'success': False, 'message': str(e), 'errorCode': 'AI_ERROR'}), 500
+        msg = str(e)
+        logger.error(f"AI processing error: {msg}")
+        lower_msg = msg.lower()
+        if (
+            "request_too_large" in lower_msg
+            or "request entity too large" in lower_msg
+            or "413" in lower_msg
+        ):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "AI processing failed: Error code: 413 - {'error': {'message': 'Request Entity Too Large', 'type': 'invalid_request_error', 'code': 'request_too_large'}}",
+                        "errorCode": "AI_ERROR",
+                    }
+                ),
+                413,
+            )
+        return jsonify({"success": False, "message": msg, "errorCode": "AI_ERROR"}), 500
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
-        return jsonify({'success': False, 'message': 'Internal server error', 'errorCode': 'INTERNAL_ERROR'}), 500
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": "Internal server error",
+                    "errorCode": "INTERNAL_ERROR",
+                }
+            ),
+            500,
+        )
 
 
-@bp.route('/smart-advisor', methods=['POST'])
+@bp.route("/smart-advisor", methods=["POST"])
 def smart_advisor():
     """Smart Advisor chatbot endpoint — uses Groq (fast, free tier available)."""
     try:
         data = request.get_json()
         if not data:
-            return jsonify({'success': False, 'message': 'Request body required'}), 400
+            return jsonify({"success": False, "message": "Request body required"}), 400
 
-        messages      = data.get('messages', [])
-        system_prompt = data.get('systemPrompt', 'You are Smart Advisor at DIU.')
+        messages = data.get("messages", [])
+        system_prompt = data.get("systemPrompt", "You are Smart Advisor at DIU.")
         try:
-            max_tokens = max(1, min(int(data.get('maxTokens', 512)), 4096))
+            max_tokens = max(1, min(int(data.get("maxTokens", 512)), 4096))
         except (ValueError, TypeError):
             max_tokens = 512
 
         if not messages:
-            return jsonify({'success': False, 'message': 'messages array required'}), 400
+            return (
+                jsonify({"success": False, "message": "messages array required"}),
+                400,
+            )
 
         groq_svc = get_groq_service()
         if groq_svc is None:
-            return jsonify({'success': False, 'message': 'AI service not configured'}), 503
+            return (
+                jsonify({"success": False, "message": "AI service not configured"}),
+                503,
+            )
 
-        advisor_client = getattr(groq_svc, 'advisor_client', None)
-        advisor_model  = getattr(groq_svc, 'advisor_model', None)
+        advisor_client = getattr(groq_svc, "advisor_client", None)
+        advisor_model = getattr(groq_svc, "advisor_model", None)
         if advisor_client is None or advisor_model is None:
-            return jsonify({'success': False, 'message': 'Advisor client not initialised'}), 503
+            return (
+                jsonify(
+                    {"success": False, "message": "Advisor client not initialised"}
+                ),
+                503,
+            )
 
         # Build messages for Groq
-        groq_messages = [{'role': 'system', 'content': system_prompt + "\n\n" + ANSWER_FORMAT_RULES}]
-        for m in messages[-12:]:                          # keep last 12 for context
-            role = m.get('role', 'user')
-            if role in ('user', 'assistant'):
-                groq_messages.append({'role': role, 'content': m.get('content', '')})
+        groq_messages = [
+            {"role": "system", "content": system_prompt + "\n\n" + ANSWER_FORMAT_RULES}
+        ]
+        for m in messages[-12:]:  # keep last 12 for context
+            role = m.get("role", "user")
+            if role in ("user", "assistant"):
+                groq_messages.append({"role": role, "content": m.get("content", "")})
 
         completion = advisor_client.chat.completions.create(
             model=advisor_model,
@@ -116,45 +184,60 @@ def smart_advisor():
             temperature=0.7,
         )
         reply = completion.choices[0].message.content
-        return jsonify({'success': True, 'reply': reply}), 200
+        return jsonify({"success": True, "reply": reply}), 200
 
     except Exception as e:
-        logger.error(f'Smart Advisor error: {e}')
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error(f"Smart Advisor error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
-@bp.route('/smart-proctor', methods=['POST'])
+@bp.route("/smart-proctor", methods=["POST"])
 def smart_proctor():
     """Smart Proctor chatbot endpoint — uses Groq API key 3."""
     try:
         data = request.get_json()
         if not data:
-            return jsonify({'success': False, 'message': 'Request body required'}), 400
+            return jsonify({"success": False, "message": "Request body required"}), 400
 
-        messages      = data.get('messages', [])
-        system_prompt = data.get('systemPrompt', 'You are a Smart Proctor Assistant at DIU.')
+        messages = data.get("messages", [])
+        system_prompt = data.get(
+            "systemPrompt", "You are a Smart Proctor Assistant at DIU."
+        )
         try:
-            max_tokens = max(1, min(int(data.get('maxTokens', 1024)), 4096))
+            max_tokens = max(1, min(int(data.get("maxTokens", 1024)), 4096))
         except (ValueError, TypeError):
             max_tokens = 1024
 
         if not messages:
-            return jsonify({'success': False, 'message': 'messages array required'}), 400
+            return (
+                jsonify({"success": False, "message": "messages array required"}),
+                400,
+            )
 
         groq_svc = get_groq_service()
         if groq_svc is None:
-            return jsonify({'success': False, 'message': 'AI service not configured'}), 503
+            return (
+                jsonify({"success": False, "message": "AI service not configured"}),
+                503,
+            )
 
-        proctor_client = getattr(groq_svc, 'proctor_client', None)
-        proctor_model  = getattr(groq_svc, 'proctor_model', None)
+        proctor_client = getattr(groq_svc, "proctor_client", None)
+        proctor_model = getattr(groq_svc, "proctor_model", None)
         if proctor_client is None or proctor_model is None:
-            return jsonify({'success': False, 'message': 'Proctor client not initialised'}), 503
+            return (
+                jsonify(
+                    {"success": False, "message": "Proctor client not initialised"}
+                ),
+                503,
+            )
 
-        groq_messages = [{'role': 'system', 'content': system_prompt + "\n\n" + ANSWER_FORMAT_RULES}]
+        groq_messages = [
+            {"role": "system", "content": system_prompt + "\n\n" + ANSWER_FORMAT_RULES}
+        ]
         for m in messages[-16:]:
-            role = m.get('role', 'user')
-            if role in ('user', 'assistant'):
-                groq_messages.append({'role': role, 'content': m.get('content', '')})
+            role = m.get("role", "user")
+            if role in ("user", "assistant"):
+                groq_messages.append({"role": role, "content": m.get("content", "")})
 
         completion = proctor_client.chat.completions.create(
             model=proctor_model,
@@ -163,58 +246,74 @@ def smart_proctor():
             temperature=0.7,
         )
         reply = completion.choices[0].message.content
-        return jsonify({'success': True, 'reply': reply}), 200
+        return jsonify({"success": True, "reply": reply}), 200
 
     except Exception as e:
-        logger.error(f'Smart Proctor error: {e}')
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error(f"Smart Proctor error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
-@bp.route('/vision', methods=['POST'])
+@bp.route("/vision", methods=["POST"])
 def vision_analysis():
     """Analyze images using Groq vision model (llama-4-scout). Works for all chatbots."""
     try:
         data = request.get_json()
         if not data:
-            return jsonify({'success': False, 'message': 'Request body required'}), 400
+            return jsonify({"success": False, "message": "Request body required"}), 400
 
-        messages      = data.get('messages', [])
-        system_prompt = data.get('systemPrompt', 'You are a helpful AI assistant.')
-        image_b64     = data.get('imageBase64', '')
+        messages = data.get("messages", [])
+        system_prompt = data.get("systemPrompt", "You are a helpful AI assistant.")
+        image_b64 = data.get("imageBase64", "")
         try:
-            max_tokens = max(1, min(int(data.get('maxTokens', 1024)), 4096))
+            max_tokens = max(1, min(int(data.get("maxTokens", 1024)), 4096))
         except (ValueError, TypeError):
             max_tokens = 1024
 
         if not image_b64:
-            return jsonify({'success': False, 'message': 'imageBase64 (data URL) required'}), 400
+            return (
+                jsonify(
+                    {"success": False, "message": "imageBase64 (data URL) required"}
+                ),
+                400,
+            )
 
         groq_svc = get_groq_service()
         if groq_svc is None:
-            return jsonify({'success': False, 'message': 'AI service not configured'}), 503
+            return (
+                jsonify({"success": False, "message": "AI service not configured"}),
+                503,
+            )
 
         # Use proctor_client (key 3) → advisor_client (key 2) → main client (key 1)
         vision_client = (
-            getattr(groq_svc, 'proctor_client', None)
-            or getattr(groq_svc, 'advisor_client', None)
-            or getattr(groq_svc, 'client', None)
+            getattr(groq_svc, "proctor_client", None)
+            or getattr(groq_svc, "advisor_client", None)
+            or getattr(groq_svc, "client", None)
         )
         vision_model = Config.GROQ_VISION_MODEL
 
-        groq_messages = [{'role': 'system', 'content': system_prompt + "\n\n" + ANSWER_FORMAT_RULES}]
+        groq_messages = [
+            {"role": "system", "content": system_prompt + "\n\n" + ANSWER_FORMAT_RULES}
+        ]
         for m in messages[:-1]:
-            role = m.get('role', 'user')
-            if role in ('user', 'assistant'):
-                groq_messages.append({'role': role, 'content': m.get('content', '')})
+            role = m.get("role", "user")
+            if role in ("user", "assistant"):
+                groq_messages.append({"role": role, "content": m.get("content", "")})
 
-        last_text = messages[-1].get('content', 'Please analyze this image.') if messages else 'Please analyze this image.'
-        groq_messages.append({
-            'role': 'user',
-            'content': [
-                {'type': 'text', 'text': last_text},
-                {'type': 'image_url', 'image_url': {'url': image_b64}},
-            ],
-        })
+        last_text = (
+            messages[-1].get("content", "Please analyze this image.")
+            if messages
+            else "Please analyze this image."
+        )
+        groq_messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": last_text},
+                    {"type": "image_url", "image_url": {"url": image_b64}},
+                ],
+            }
+        )
 
         completion = vision_client.chat.completions.create(
             model=vision_model,
@@ -223,19 +322,24 @@ def vision_analysis():
             temperature=0.7,
         )
         reply = completion.choices[0].message.content
-        return jsonify({'success': True, 'reply': reply}), 200
+        return jsonify({"success": True, "reply": reply}), 200
 
     except Exception as e:
-        logger.error(f'Vision analysis error: {e}')
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error(f"Vision analysis error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
-@bp.route('/health', methods=['GET'])
+@bp.route("/health", methods=["GET"])
 def health():
     svc = get_groq_service()
-    return jsonify({
-        'status': 'healthy',
-        'groqConfigured': svc is not None,
-        'model': svc.model if svc else None,
-        'rag': rag_service.status()
-    }), 200
+    return (
+        jsonify(
+            {
+                "status": "healthy",
+                "groqConfigured": svc is not None,
+                "model": svc.model if svc else None,
+                "rag": rag_service.status(),
+            }
+        ),
+        200,
+    )

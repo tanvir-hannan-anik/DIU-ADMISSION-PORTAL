@@ -41,31 +41,35 @@ public class AdmissionService {
         map.put("humanities",  new String[]{"April 19, " + year + " | 10:00 AM – 1:00 PM", "April 26, " + year + " | 9:00 AM – 12:00 PM"});
         return map;
     }
-    private static final Map<String, String[]> FACULTY_SCHEDULE = buildFacultySchedule();
+    // Recomputed on every call so the year always reflects "today", not class-load time.
 
     private String[] getScheduleForProgram(String program) {
-        if (program == null) return FACULTY_SCHEDULE.get("science");
+        Map<String, String[]> schedule = buildFacultySchedule();
+        if (program == null) return schedule.getOrDefault("science", new String[]{"TBD", "TBD"});
         String p = program.toLowerCase();
+        String faculty;
         if (p.contains("cse") || p.contains("swe") || p.contains("software") || p.contains("computing") ||
                 p.contains("cis") || p.contains("itm") || p.contains("mct") || p.contains("multimedia") ||
                 p.contains("robotics") || p.contains("computer")) {
-            return FACULTY_SCHEDULE.get("science");
+            faculty = "science";
         } else if (p.contains("bba") || p.contains("business") || p.contains("finance") || p.contains("marketing") ||
                 p.contains("accounting") || p.contains("entrepreneurship") || p.contains("tourism") ||
                 p.contains("real estate") || p.contains("fintech")) {
-            return FACULTY_SCHEDULE.get("business");
+            faculty = "business";
         } else if (p.contains("eee") || p.contains("electrical") || p.contains("civil") || p.contains("textile") ||
                 p.contains("architecture") || p.contains("ice") || p.contains("communication")) {
-            return FACULTY_SCHEDULE.get("engineering");
+            faculty = "engineering";
         } else if (p.contains("pharmacy") || p.contains("health") || p.contains("nutrition") ||
                 p.contains("agricultural") || p.contains("genetic") || p.contains("fisheries") ||
                 p.contains("environmental") || p.contains("sports")) {
-            return FACULTY_SCHEDULE.get("health");
+            faculty = "health";
         } else if (p.contains("english") || p.contains("law") || p.contains("llb") ||
                 p.contains("journalism") || p.contains("jmc")) {
-            return FACULTY_SCHEDULE.get("humanities");
+            faculty = "humanities";
+        } else {
+            faculty = "science";
         }
-        return FACULTY_SCHEDULE.get("science");
+        return schedule.getOrDefault(faculty, new String[]{"TBD", "TBD"});
     }
 
     // ── Submit application ──────────────────────────────────────

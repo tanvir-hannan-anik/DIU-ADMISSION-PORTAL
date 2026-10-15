@@ -36,7 +36,7 @@ public class PaymentController {
     public ResponseEntity<ResponseWrapper<Map<String, Object>>> getMyTotal() {
         String email = currentEmail();
         Long total = paymentRepo.sumCompletedByEmail(email);
-        return ResponseEntity.ok(ResponseWrapper.success(Map.of("totalPaid", total)));
+        return ResponseEntity.ok(ResponseWrapper.success(Map.of("totalPaid", total != null ? total : 0L)));
     }
 
     @GetMapping("/all")

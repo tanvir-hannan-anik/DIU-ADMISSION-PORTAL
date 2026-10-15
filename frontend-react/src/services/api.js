@@ -39,8 +39,12 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('authToken');
-      window.location.href = '/login';
+      // Don't redirect if already on login to avoid loops
+      if (window.location.pathname !== '/login') {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('authUser');
+        window.location.href = '/login';
+      }
     }
 
     if (API_CONFIG.DEBUG) console.error('Response error:', error);

@@ -5,6 +5,14 @@ from app.services import rag_service
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_GROQ_MODELS = (
+    "openai/gpt-oss-20b",
+    "groq/compound",
+    "qwen/qwen3.6-27b",
+    "groq/compound-mini",
+    "allam-2-7b",
+)
+
 # Shared answer-formatting contract — applied to EVERY AI reply across the site
 # (main chatbot, Smart Advisor, Smart Proctor, vision). One source of truth.
 ANSWER_FORMAT_RULES = """ANSWER FORMATTING (STRICT — follow in every reply):
@@ -598,38 +606,163 @@ PRIMARY GOAL: Help every student find the right department and successfully comp
 
 
 class GroqService:
+    @staticmethod
+    def _normalize_request_payload(
+        prompt: str,
+        context: str | None = None,
+        history: list | None = None,
+        max_history: int = 6,
+        max_prompt_chars: int = 1200,
+        max_context_chars: int = 2000,
+        max_message_chars: int = 600,
+    ) -> dict:
+        """Trim oversized chat payloads before sending them to Groq."""
+        safe_prompt = (prompt or "").strip()
+        if len(safe_prompt) > max_prompt_chars:
+            safe_prompt = safe_prompt[:max_prompt_chars].rstrip()
+
+        safe_context = (context or "").strip()
+        if len(safe_context) > max_context_chars:
+            safe_context = safe_context[:max_context_chars].rstrip()
+
+        safe_history = []
+        for msg in (history or [])[-max_history:]:
+            if not isinstance(msg, dict):
+                continue
+            text = str(msg.get("text", "")).strip()
+            if len(text) > max_message_chars:
+                text = text[:max_message_chars].rstrip()
+            if not text:
+                continue
+            safe_history.append(
+                {
+                    "type": "user" if msg.get("type") == "user" else "assistant",
+                    "text": text,
+                }
+            )
+
+        return {
+            "prompt": safe_prompt,
+            "context": safe_context,
+            "history": safe_history,
+        }
+
+    @staticmethod
+    def _compact_system_prompt(system_prompt: str, max_chars: int = 12000) -> str:
+        """Keep the system instructions under provider limits without losing the core policy."""
+        text = (system_prompt or "").strip()
+        if not text or len(text) <= max_chars:
+            return text
+
+        keep_head = max(1600, min(len(text) // 2, max_chars - 1800))
+        keep_tail = max(600, max_chars - keep_head - 900)
+        head = text[:keep_head].rstrip()
+        tail = text[-keep_tail:].lstrip()
+        marker = (
+            "\n\n[prompt truncated for model size limits; "
+            "essential instructions and recent context were kept]\n\n"
+        )
+        compacted = (head + marker + tail)[:max_chars].rstrip()
+        if len(compacted) >= max_chars:
+            compacted = (head[: max_chars - 200] + marker + tail[:150])[
+                :max_chars
+            ].rstrip()
+        return compacted
+
+    @staticmethod
+    def get_model_candidates(preferred_model: str | None = None):
+        preferred_model = (preferred_model or "").strip()
+        candidates = []
+        seen = set()
+        for name in [
+            preferred_model,
+            *DEFAULT_GROQ_MODELS,
+            "llama-3.1-8b-instant",
+            "llama-3.3-70b-versatile",
+        ]:
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            candidates.append(name)
+        return candidates
+
+    def _resolve_available_model(
+        self, preferred_model: str | None = None, client: Groq | None = None
+    ):
+        client = client or self.client
+        try:
+            available = {m.id for m in client.models.list().data}
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            logger.warning(
+                "Failed to list Groq models (%s); using configured defaults", exc
+            )
+            available = set()
+
+        for candidate in self.get_model_candidates(preferred_model):
+            if candidate in available:
+                return candidate
+
+        # If the account exposes the model under a slash-less alias or names become
+        # unavailable, still prefer the explicit configured value when it is set.
+        if preferred_model:
+            logger.warning(
+                "Configured Groq model unavailable on this account: %s", preferred_model
+            )
+            return preferred_model
+
+        for fallback in DEFAULT_GROQ_MODELS:
+            if fallback:
+                return fallback
+
+        return "openai/gpt-oss-20b"
+
     def __init__(self):
         if not Config.GROQ_API_KEY:
-            raise ValueError("GROQ_API_KEY is not configured. Add it to your .env file.")
+            raise ValueError(
+                "GROQ_API_KEY is not configured. Add it to your .env file."
+            )
         self.client = Groq(api_key=Config.GROQ_API_KEY)
-        self.model = Config.GROQ_MODEL
+        self.model = self._resolve_available_model(Config.GROQ_MODEL, self.client)
         self.max_tokens = Config.MAX_TOKENS
         logger.info(f"Groq service initialized - model: {self.model}")
 
         # Dedicated client for Smart Advisor (uses separate API key + stronger model)
         if Config.GROQ_API_KEY_2:
             self.advisor_client = Groq(api_key=Config.GROQ_API_KEY_2)
-            self.advisor_model = Config.GROQ_MODEL_2
-            logger.info(f"Smart Advisor Groq client initialized - model: {self.advisor_model}")
+            self.advisor_model = self._resolve_available_model(
+                Config.GROQ_MODEL_2, self.advisor_client
+            )
+            logger.info(
+                f"Smart Advisor Groq client initialized - model: {self.advisor_model}"
+            )
         else:
             self.advisor_client = self.client
             self.advisor_model = self.model
-            logger.warning("GROQ_API_KEY_2 not set — Smart Advisor will use primary key")
+            logger.warning(
+                "GROQ_API_KEY_2 not set — Smart Advisor will use primary key"
+            )
 
         # Dedicated client for Smart Proctor (API key 3)
         if Config.GROQ_API_KEY_3:
             self.proctor_client = Groq(api_key=Config.GROQ_API_KEY_3)
-            self.proctor_model = Config.GROQ_MODEL_3
-            logger.info(f"Smart Proctor Groq client initialized - model: {self.proctor_model}")
+            self.proctor_model = self._resolve_available_model(
+                Config.GROQ_MODEL_3, self.proctor_client
+            )
+            logger.info(
+                f"Smart Proctor Groq client initialized - model: {self.proctor_model}"
+            )
         else:
             self.proctor_client = self.client
             self.proctor_model = self.model
-            logger.warning("GROQ_API_KEY_3 not set — Smart Proctor will use primary key")
+            logger.warning(
+                "GROQ_API_KEY_3 not set — Smart Proctor will use primary key"
+            )
 
     def _legacy_system_prompt(self) -> str:
         return (
             LEGACY_SYSTEM_PROMPT.replace("{DEPARTMENT_KB}", "", 1)
-            + "\n\n" + ANSWER_FORMAT_RULES
+            + "\n\n"
+            + ANSWER_FORMAT_RULES
         )
 
     def _build_system_prompt(self, prompt: str) -> tuple[str, str]:
@@ -658,59 +791,92 @@ class GroqService:
         mode = "rag"
         if result.get("keyword_matched") and result.get("short_query"):
             depts = ", ".join(result.get("keyword_depts", []))
-            recommend_note = SHORT_QUERY_RECO_NOTE.replace("{DEPTS}", depts or "the matched departments")
+            recommend_note = SHORT_QUERY_RECO_NOTE.replace(
+                "{DEPTS}", depts or "the matched departments"
+            )
             mode = "rag-keyword"
 
         logger.info(
             "Context built [mode=%s] — %d vector chunks, keyword_depts=%s",
-            mode, len(result.get("hits", [])), result.get("keyword_depts", []),
+            mode,
+            len(result.get("hits", [])),
+            result.get("keyword_depts", []),
         )
         rag_prompt = (
-            RAG_SYSTEM_PROMPT
-            .replace("{STRUCTURED_TEMPLATES}", STRUCTURED_TEMPLATES)
+            RAG_SYSTEM_PROMPT.replace("{STRUCTURED_TEMPLATES}", STRUCTURED_TEMPLATES)
             .replace("{ANSWER_FORMAT}", ANSWER_FORMAT_RULES)
             .replace("{RETRIEVED_CONTEXT}", context)
         ) + recommend_note
         return rag_prompt, mode
 
-    def process_prompt(self, prompt: str, context: str = None, module_type: str = None, history: list = None) -> dict:
-        try:
-            system_prompt, mode = self._build_system_prompt(prompt)
-            messages = [{"role": "system", "content": system_prompt}]
+    def process_prompt(
+        self,
+        prompt: str,
+        context: str = None,
+        module_type: str = None,
+        history: list = None,
+    ) -> dict:
+        safe_payload = self._normalize_request_payload(
+            prompt=prompt,
+            context=context,
+            history=history,
+        )
+        prompt = safe_payload["prompt"]
+        history = safe_payload["history"]
 
-            if history:
-                for msg in history:
-                    role = "user" if msg.get("type") == "user" else "assistant"
-                    messages.append({"role": role, "content": msg.get("text", "")})
+        system_prompt, mode = self._build_system_prompt(prompt)
+        system_prompt = self._compact_system_prompt(system_prompt)
+        messages = [{"role": "system", "content": system_prompt}]
 
-            messages.append({"role": "user", "content": prompt})
+        if history:
+            for msg in history:
+                role = "user" if msg.get("type") == "user" else "assistant"
+                messages.append({"role": role, "content": msg.get("text", "")})
 
-            completion = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                max_tokens=self.max_tokens,
-                temperature=0.7
-            )
+        messages.append({"role": "user", "content": prompt})
 
-            response_text = completion.choices[0].message.content
-            usage = completion.usage
+        last_error = None
+        for model_name in self.get_model_candidates(self.model):
+            try:
+                completion = self.client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    max_tokens=self.max_tokens,
+                    temperature=0.7,
+                )
+                response_text = completion.choices[0].message.content
+                usage = completion.usage
 
-            logger.info(f"Groq response generated [mode={mode}] - tokens used: {usage.total_tokens}")
+                logger.info(
+                    f"Groq response generated [mode={mode}, model={model_name}] - tokens used: {usage.total_tokens}"
+                )
+                self.model = model_name
 
-            return {
-                'success': True,
-                'response': response_text,
-                'modelUsed': self.model,
-                'status': 'success',
-                'ragMode': mode,
-                'tokensUsed': {
-                    'prompt': usage.prompt_tokens,
-                    'completion': usage.completion_tokens,
-                    'total': usage.total_tokens
-                },
-                'confidence': 0.95
-            }
+                return {
+                    "success": True,
+                    "response": response_text,
+                    "modelUsed": self.model,
+                    "status": "success",
+                    "ragMode": mode,
+                    "tokensUsed": {
+                        "prompt": usage.prompt_tokens,
+                        "completion": usage.completion_tokens,
+                        "total": usage.total_tokens,
+                    },
+                    "confidence": 0.95,
+                }
+            except Exception as exc:
+                last_error = exc
+                error_text = str(exc).lower()
+                if (
+                    "model_not_found" not in error_text
+                    and "not found" not in error_text
+                    and "404" not in error_text
+                ):
+                    raise RuntimeError(f"AI processing failed: {exc}")
+                logger.warning(
+                    "Groq model %s rejected; trying fallback model: %s", model_name, exc
+                )
 
-        except Exception as e:
-            logger.error(f"Groq API error: {str(e)}")
-            raise RuntimeError(f"AI processing failed: {str(e)}")
+        logger.error(f"Groq API error: {last_error}")
+        raise RuntimeError(f"AI processing failed: {last_error}")

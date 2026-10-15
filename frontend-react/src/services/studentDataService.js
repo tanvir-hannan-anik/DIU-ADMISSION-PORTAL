@@ -1,5 +1,5 @@
 // Saves and loads student data (course registrations, late registrations, profile)
-// from the MySQL backend when the user has a real JWT, otherwise localStorage only.
+// from the PostgreSQL backend when the user has a real JWT, otherwise localStorage only.
 
 import api from './api';
 

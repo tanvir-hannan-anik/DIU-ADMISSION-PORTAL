@@ -2,7 +2,7 @@
 
 ## Project Summary
 
-This is a full-stack university automation system built for **Daffodil International University (DIU)**. It modernizes how prospective and current students interact with the university — replacing manual processes with intelligent, AI-driven workflows. The platform is designed as a **three-tier architecture** deployed on Render.com.
+This is a full-stack university automation system built for **Daffodil International University (DIU)**. It modernizes how prospective and current students interact with the university — replacing manual processes with intelligent, AI-driven workflows — and gives university staff a dedicated admin portal for CRM, analytics, and AI-pipeline control. The platform is a **three-service architecture** (React SPA, Spring Boot API, Flask AI microservice) sharing a single Supabase Postgres database, deployed on Render.com.
 
 ---
 
@@ -22,11 +22,11 @@ This is a full-stack university automation system built for **Daffodil Internati
 
 - **Framework:** Spring Boot 3.2.0
 - **ORM:** Spring Data JPA with Hibernate
-- **Security:** Spring Security + JWT (jjwt 0.12.3) — stateless token-based auth
-- **Database:** PostgreSQL (production on Render.com), H2 in-memory (local development)
+- **Security:** Spring Security + JWT (jjwt 0.12.3) — stateless token-based auth, plus role-based access control (RBAC) for the admin portal
+- **Database:** Supabase Postgres (production, Session Pooler/IPv4), H2 in-memory (local development)
 - **Email:** Spring Mail via Gmail SMTP
 - **Build Tool:** Maven
-- **Role:** Acts as the central REST API gateway and data persistence layer
+- **Role:** Acts as the central REST API gateway and data persistence layer; also serves the admin portal's auth, CRM, and analytics APIs
 - **Key Directory:** `backend-spring-boot/src/main/java/com/university/`
 
 ### Backend — Python Flask (AI Microservice)
@@ -35,17 +35,21 @@ This is a full-stack university automation system built for **Daffodil Internati
 - **LLM Provider:** Groq API using `llama-3.3-70b-versatile` — 3 separate API keys for load balancing
 - **Vision/Image AI:** Groq `meta-llama/llama-4-scout-17b` (department flyer OCR)
 - **Embeddings:** Google Gemini API (`gemini-embedding-001`, 768-dimensional vectors)
-- **Vector Database:** Qdrant Cloud (cosine similarity search over RAG knowledge base)
-- **Web Scraping:** BeautifulSoup4 + lxml (live university data)
+- **Vector Database:** Qdrant Cloud (cosine similarity search over RAG knowledge base + a second `diu_semcache` collection for the semantic response cache)
+- **Web Scraping:** BeautifulSoup4 + lxml (live university data), with an optional JS-rendered fetch path for pages that need it
+- **DB Access:** psycopg connection pool (`app/db/pg.py`) — the Python service now talks directly to the same Supabase Postgres DB as Spring, via `kb_*` repositories, for the AI Knowledge Pipeline
+- **Scheduling:** APScheduler (in-process, advisory-lock guarded) or Render/GitHub Actions cron, for periodic knowledge-base sync
 - **PDF Processing:** pypdf + PIL
-- **Role:** Handles all AI, RAG, and LLM operations independently from the Java backend
+- **Role:** Handles all AI, RAG, and LLM operations independently from the Java backend; also owns the AI Knowledge Pipeline (scraping → change detection → incremental indexing) and the 6-layer token-optimized chat pipeline
 - **Key Directory:** `backend-python/app/`
 
 ### Infrastructure & Deployment
 
 - **Hosting:** Render.com (3 services: React static site, Spring Boot Docker container, Python native service)
-- **Database:** PostgreSQL free tier on Render.com
+- **Database:** Supabase Postgres (shared by both the Spring Boot and Python services)
 - **Live Jobs API:** JSearch via RapidAPI
+- **Visitor Analytics:** Microsoft Clarity (real metrics pulled into the admin dashboard via the Clarity Data Export API); PostHog wiring documented for future use
+- **Automation:** GitHub Actions workflow (`kb-sync.yml`) periodically triggers the AI Knowledge Pipeline sync
 - **Containerization:** Docker Compose for local development
 
 ---
@@ -54,23 +58,28 @@ This is a full-stack university automation system built for **Daffodil Internati
 
 ```
   [ React SPA — diu-frontend.onrender.com ]
+     ├── Public site (admission, jobs, proctor, chatbots)
+     └── Admin Portal (/admin — analytics, CRM, pipeline)
            ↓ REST API calls
   [ Spring Boot API — diu-spring-api.onrender.com ]
+     ├── Public/student controllers (JWT auth)
+     └── Admin controllers (RBAC, audit log, leads, Clarity proxy)
            ↓ AI requests             ↓ DB queries
-  [ Flask AI Service ]          [ PostgreSQL DB ]
-  [ Groq + RAG + Jobs ]         [ university_automation ]
-           ↓ vectors                 ↑ JPA entities
-  [ Qdrant Cloud ]          [ AdmissionApplication,
-  [ diu_kb collection ]       CourseRegistrationRecord,
-           ↓ embeddings         User, Notice, Payment... ]
-  [ Google Gemini API ]
+  [ Flask AI Service ]          [ Supabase Postgres ]
+  [ Groq + RAG + Jobs ]         [ AdmissionApplication, Lead,
+  [ + AI Knowledge Pipeline ]     CourseRegistrationRecord,
+           ↓ vectors                User, Notice, Payment,
+  [ Qdrant Cloud ]                 AdminAuditLog, kb_* tables... ]
+  [ diu_kb + diu_semcache ]            ↑ JPA entities / psycopg
+           ↓ embeddings                       ↑
+  [ Google Gemini API ]         [ GitHub Actions kb-sync cron ]
 ```
 
 ---
 
 ---
 
-# THE FOUR CORE FEATURES
+# THE FIVE CORE FEATURES
 
 ---
 
@@ -210,6 +219,36 @@ Full voice input and output — a student can file a complaint entirely by speak
 
 ---
 
+## Feature 5 — Admin Portal (Analytics, CRM & Pipeline Control)
+
+**Key Files:**
+- `frontend-react/src/admin/` (`AdminApp.js`, `AdminLayout.js`, `AdminLoginPage.js`, `pages/`)
+- `backend-spring-boot/.../controller/AdminController.java`, `AdminUserController.java`, `AdminLeadController.java`, `AdminChatController.java`, `AdminClarityController.java`, `AnalyticsController.java`, `LeadCaptureController.java`
+- `backend-spring-boot/.../model/entity/{Lead,LeadActivity,Counselor,AdminAuditLog,ChatLog}.java`
+- `backend-python/app/routes/admin_routes.py`, `pipeline_routes.py`
+
+### What It Does
+
+A dark-themed internal dashboard at `/admin`, separate from the public site, that gives staff real operational visibility and control: security/audit, lead & applicant tracking (CRM), live analytics, and control over the AI Knowledge Pipeline.
+
+### Key Capabilities
+
+- **Role-based Auth & Audit Logging:** Dedicated admin login (`AdminLoginPage`), seeded admin account (`ADMIN_EMAIL` / `ADMIN_PASSWORD` env vars, re-synced on boot), JWT-secured admin API, and an `AdminAuditLog` trail of admin actions (login, IP, timestamp).
+- **Leads / CRM (`LeadsPage`, `FollowUpsPage`):** Public admission/contact forms automatically create a `Lead` (via `LeadCaptureController` → `/v1/leads`); leads can be assigned to `Counselor`s, tracked through pipeline stages, and followed up on via `LeadActivity` entries.
+- **Applications (`ApplicationsPage`):** Surfaces existing `AdmissionApplication` records for staff review alongside the CRM view.
+- **Live Analytics Dashboard (`AdminDashboard.js`, `analytics.js`, `widgets.js`):** Dashboard KPIs read live from the database (no demo/mock data); real visitor metrics (sessions, traffic sources, locations) pulled natively from **Microsoft Clarity's Data Export API** via `AdminClarityController`.
+- **Chat Analytics (`ChatAnalyticsPage`):** Conversation logging (`ChatLog` entity / `ChatLogController`) surfaces chatbot usage, response outcomes, and volume.
+- **AI Pipeline Control (`PipelinePage`):** Consumes the Python service's `/api/v1/admin/dashboard`, `/admin/sources`, `/admin/logs`, and `/admin/popular-questions` endpoints to show knowledge-base sync status, vector counts, cache hit ratio, tokens saved, and scheduler health; can trigger `/pipeline/sync` and `/pipeline/rebuild`.
+- **Users & Roles (`UsersRolesPage`):** Admin user/role management surface.
+- **Integrations (`IntegrationsPage`):** Central place for wiring analytics/marketing SaaS keys (PostHog, Clarity, GA4) — see `ADMIN_PORTAL_SETUP.md`.
+- **Command Palette:** Quick keyboard-driven navigation across admin pages (`CommandPalette.js`).
+
+### Setup
+
+Full step-by-step production setup (secrets, Render env vars, Clarity/PostHog wiring, CORS lockdown, security checklist) is documented in `ADMIN_PORTAL_SETUP.md`.
+
+---
+
 ---
 
 # THE RAG SYSTEM — The Project's Core Innovation
@@ -296,6 +335,10 @@ User types/speaks a question
   Qdrant cosine search over diu_kb collection
   (top-6 results, min score threshold: 0.30)
          ↓
+  Keyword retrieval layer fuses in curated + inverted-index
+  department matches (see below) — catches short/keyword
+  queries that embed too weakly to clear the score threshold
+         ↓
   Retrieved chunks formatted as [Title]\n{text}
          ↓
   Context injected into Groq system prompt
@@ -306,6 +349,15 @@ User types/speaks a question
          ↓
   Response displayed + optionally spoken aloud (TTS)
 ```
+
+### Keyword Retrieval Layer (`keyword_search_service.py`)
+
+Pure vector search misses very short or keyword-style messages (e.g. `"Ai"`, `"web"`, `"game"`, `"law"`) because a 1–2 word query embeds too weakly to clear `RAG_MIN_SCORE`. This layer fuses in a second matching path so those queries still resolve to real departments:
+
+1. **Curated topic map** — hand-tuned concept → department mappings with a human-readable reason and priority (e.g. `"ai"` → CIS → CSE → SWE, `"game"` → MCT, `"law"` → LL.B.).
+2. **Inverted index** — auto-built from the live `departments_dataset.json` fields (careers, curriculum, labs, overview), so any token the curated map misses can still match grounded department data.
+
+`build_context()` returns a grounded text block fused into the RAG context — the LLM always recommends real departments using real facts, never hallucinated ones. If nothing matches, retrieval falls back to normal RAG/legacy behavior. This layer also includes QA-verified guards so short factual questions (e.g. "What is CSE?") are not incorrectly hijacked into recommendation mode, plus whole-word department-code matching and plural normalization.
 
 ---
 
@@ -357,6 +409,89 @@ This is what makes the RAG system the project's defining technological achieveme
 
 ---
 
+---
+
+# THE AI KNOWLEDGE PIPELINE — Self-Updating Knowledge Base & Token Optimization
+
+Built on top of the core RAG system, the AI Knowledge Pipeline keeps the knowledge base **automatically fresh** (no manual re-seeding) and dramatically **cuts LLM token usage** by answering as many questions as possible without ever calling the LLM. Full design of record: `backend-python/AI_KNOWLEDGE_PIPELINE.md`.
+
+**Key Files:**
+- `backend-python/app/db/pg.py` — psycopg connection pool to Supabase Postgres
+- `backend-python/app/repositories/` — `sources_repo`, `documents_repo`, `chunks_repo`, `faq_repo`, `semcache_repo`, `metrics_repo`, `sync_repo`, `tuition_fee_repo`, `faculty_repo`
+- `backend-python/app/services/` — `content_extractor_service`, `change_detection_service`, `incremental_index_service`, `sync_service`, `scheduler_service`, `intent_service`, `faq_service`, `semantic_cache_service`, `question_normalizer`, `context_compression_service`, `cache_service`, `faculty_scraper_service`, `tuition_fee_service`, `rendered_fetch_service`
+- `backend-python/app/routes/pipeline_routes.py`, `admin_routes.py`, `faculty_routes.py`, `tuition_routes.py`, `live_data_routes.py`
+- `supabase/migrations/20260708000001_ai_knowledge_pipeline.sql`, `20260708000002_add_render_js.sql`, `20260708000003_tuition_fees.sql`
+- `.github/workflows/kb-sync.yml`
+
+## 1. Self-Updating Knowledge Sync
+
+Instead of a one-time seed, five live DIU pages (`/admission`, `/tuition-fees`, faculty directory, `/faculties`, homepage) are re-crawled on a schedule and diffed against what's already indexed:
+
+```
+Scheduler fires (per-source interval)
+         ↓
+  HTTP GET with ETag / If-Modified-Since (conditional GET)
+         ↓  304 Not Modified → skip, just bump last_synced_at
+  200 OK → content_extractor_service cleans HTML into
+  structured documents (stable natural_key per section)
+         ↓
+  change_detection_service: SHA-256 hash per document
+    • unchanged → skip (no embed, no write)
+    • new       → insert (version 1) → chunk → embed → upsert vectors
+    • changed   → update (version++) → delete old vectors →
+                  re-embed only changed chunks → upsert
+    • missing   → mark inactive, delete its vectors
+         ↓
+  Affected semantic-cache entries invalidated
+         ↓
+  kb_sync_runs row written + kb_metrics updated
+```
+
+**Why it matters:** unchanged pages never touch the Gemini embeddings API or Qdrant — only genuinely new/changed content is re-processed, keeping both cost and sync latency low.
+
+**Scheduling:** in-process **APScheduler** with a Postgres advisory lock (or Redis lock if `REDIS_URL` is set) guards against duplicate runs across gunicorn workers; alternatively `SCHEDULER_ENABLED=false` lets external triggers (Render Cron Jobs, or the GitHub Actions `kb-sync.yml` workflow) call `POST /api/v1/pipeline/sync` on a schedule — more robust on Render's free tier, which spins down on inactivity.
+
+**New data sources:** `faculty_scraper_service.py` and `tuition_fee_service.py` extend scraping to the faculty directory and tuition-fees pages specifically, with `rendered_fetch_service.py` providing a JS-rendered fetch path (`render_js` flag on `kb_sources`) for any page that turns out to require it.
+
+## 2. Six-Layer Query Optimization (Token Savings)
+
+Every chat message now passes through up to six layers before an LLM is ever called — most questions are answered in layers 1–3 for **zero LLM tokens**:
+
+| Layer | Module | Calls LLM? | Backing store |
+|---|---|---|---|
+| 1. Intent | `intent_service.py` | No | Regex/keyword table (greeting/thanks/goodbye/smalltalk → canned reply) |
+| 2. FAQ match | `faq_service.py` | No | `kb_faqs` (normalized + keyword search) |
+| 3. Semantic cache | `semantic_cache_service.py` | No | Qdrant `diu_semcache` collection, ≥95% similarity match reuses a prior answer |
+| 4. RAG retrieval | `rag_service.py` (+ keyword fusion) | No | Qdrant `diu_kb` |
+| 5. Context compression | `context_compression_service.py` | No | Dedupes/merges overlapping retrieved chunks before they reach the prompt |
+| 6. LLM generation | `groq_service.py` | **Yes** | Generates the answer, then writes it back into the semantic cache (Layer 3) for future reuse |
+
+- **`question_normalizer.py`** lowercases, strips punctuation/whitespace, and expands a small synonym map (e.g. `"fee"` → `"tuition fee"`, `"cse"` → `"computer science"`) so near-identical phrasings collapse to the same cache key.
+- **Popularity promotion:** FAQ/semantic-cache entries above a hit-count threshold (`POPULAR_HIT_THRESHOLD`) are marked permanent so they're never evicted.
+- **Cache invalidation:** when a source document changes, any semantic-cache entries derived from it are automatically invalidated so stale answers are never served.
+- **`kb_query_log`** records which layer answered each query and the tokens saved, feeding the admin "AI Pipeline" dashboard's cache-hit-ratio and tokens-saved metrics.
+
+## 3. New API Surface
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/v1/pipeline/sync` | Sync one source (`?source=`) or all sources |
+| POST | `/api/v1/pipeline/rebuild` | Full re-crawl + full Qdrant rebuild (admin) |
+| GET | `/api/v1/pipeline/status` | Sources, last sync time, vector counts, embedding status |
+| GET | `/api/v1/pipeline/scheduler` | Scheduler jobs + next-run times |
+| GET | `/api/v1/admin/dashboard` | Sync/cache/token metrics for the admin "AI Pipeline" tab |
+| GET | `/api/v1/admin/sources` | Per-source sync health + failed pages |
+| GET | `/api/v1/admin/logs` | Recent `kb_event_log` entries |
+| GET | `/api/v1/admin/popular-questions` | Top questions by hit count |
+| GET/POST | `/api/v1/faculty/...` | Faculty directory data (from `faculty_scraper_service`) |
+| GET/POST | `/api/v1/tuition/...` | Tuition fee data (from `tuition_fee_service`) |
+
+## 4. Reliability
+
+Failed fetches retry with exponential backoff and mark `consecutive_failures` on the source without blocking other sources; a 304/timeout/5xx is treated as "keep last-known data"; a mid-sync embedding/Qdrant failure marks the sync run `partial` and is retried on the next tick — the chat pipeline's existing graceful-degradation guarantees (see below) are unaffected either way.
+
+---
+
 ## Summary of All Key Technologies
 
 | Layer | Technology | Purpose |
@@ -370,10 +505,14 @@ This is what makes the RAG system the project's defining technological achieveme
 | Embeddings | Google Gemini `gemini-embedding-001` | Semantic vector creation |
 | Vector Search | Qdrant Cloud | RAG knowledge retrieval |
 | Web Scraping | BeautifulSoup4 + lxml | Live university data |
-| Relational DB | PostgreSQL (Render.com) | Student records, forms |
+| Relational DB | Supabase Postgres | Student records, forms, leads, audit logs, kb_* pipeline tables |
+| DB Access (Python) | psycopg connection pool | AI Knowledge Pipeline reads/writes |
 | Live Jobs | JSearch RapidAPI | Real job listings |
 | PDF Export | jspdf + html2canvas | CV generation |
 | Voice | Web Speech API | Hands-free interaction |
+| Admin Analytics UI | React (recharts) | Admin dashboard charts/KPIs |
+| Visitor Analytics | Microsoft Clarity Data Export API | Real session/traffic metrics in admin |
+| Scheduling | APScheduler / GitHub Actions (`kb-sync.yml`) | Periodic knowledge-base sync |
 | Deployment | Render.com | Cloud hosting |
 
 ---
@@ -390,23 +529,36 @@ GEMINI_API_KEY
 GEMINI_EMBED_MODEL=gemini-embedding-001
 QDRANT_URL, QDRANT_API_KEY
 QDRANT_COLLECTION=diu_kb
+QDRANT_SEMCACHE_COLLECTION=diu_semcache
 RAG_ENABLED=true
 RAG_TOP_K=6
 RAG_MIN_SCORE=0.30
 RAPIDAPI_KEY
 FLASK_ENV=production
 MAX_TOKENS=1024
+
+# AI Knowledge Pipeline
+DATABASE_URL=postgresql://...          # Supabase session-pooler URL (same DB as Spring)
+REDIS_URL=                             # optional; blank -> in-proc cache + advisory lock
+SEMANTIC_CACHE_THRESHOLD=0.95
+SCHEDULER_ENABLED=true
+POPULAR_HIT_THRESHOLD=10
+SYNC_ADMISSION_INTERVAL=900
+SYNC_NOTICE_INTERVAL=300
+SYNC_FEES_INTERVAL=3600
+SYNC_DEPARTMENT_INTERVAL=86400
 ```
 
 ### Spring Boot (Production)
 
 ```
 SPRING_PROFILES_ACTIVE=prod
-DB_HOST, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD
+DB_HOST, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD   # Supabase Postgres
 PYTHON_SERVICE_URL=http://python-service:5000
 CORS_ALLOWED_ORIGINS
 JWT_SECRET
 MAIL_USERNAME, MAIL_PASSWORD
+ADMIN_EMAIL, ADMIN_PASSWORD                            # admin portal login, re-synced on boot
 ```
 
 ### React Frontend
@@ -435,3 +587,12 @@ REACT_APP_DEBUG=false
 | `ScholarshipApplication.java` | Waiver and scholarship applications |
 | `JobListing.java` | Stored job listings |
 | `Notice.java` | University announcements |
+| `StudentProfile.java` | Extended student profile data |
+| `StudentNotification.java` | In-app notifications |
+| `Lead.java` | CRM lead captured from public forms (admission, contact) |
+| `LeadActivity.java` | Follow-up notes / status changes on a `Lead` |
+| `Counselor.java` | Staff member a `Lead` can be assigned to |
+| `AdminAuditLog.java` | Admin action audit trail (login, IP, timestamp) |
+| `ChatLog.java` | Logged chatbot conversations for Chat Analytics |
+
+**AI Knowledge Pipeline tables** (Supabase, defined in `supabase/migrations/20260708000001_ai_knowledge_pipeline.sql` and later migrations, accessed from Python via `app/repositories/`): `kb_sources`, `kb_documents`, `kb_document_versions`, `kb_chunks`, `kb_faqs`, `kb_semantic_cache`, `kb_sync_runs`, `kb_event_log`, `kb_metrics`, `kb_query_log`, plus tuition-fee tables added in `20260708000003_tuition_fees.sql`.

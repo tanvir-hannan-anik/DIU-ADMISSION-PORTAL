@@ -149,29 +149,31 @@ const CVTemplate = ({ profile, career, photo, targetJob = null, cvData = null })
       toast.error('Please allow pop-ups for this site to download your CV.');
       return;
     }
+    // Escape HTML special characters to prevent layout breakage / self-XSS
+    const esc = (s) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const skillsHtml = relevantSkills.map((s, i) => `
       <div class="skill-row">
-        <span class="skill-name">${s}</span>
+        <span class="skill-name">${esc(s)}</span>
         <div class="skill-bar"><div class="skill-fill" style="width:${Math.max(45,92-i*8)}%"></div></div>
       </div>`).join('');
-    const softHtml = data.softSkills.map(s => `<div class="soft-item">• ${s}</div>`).join('');
+    const softHtml = data.softSkills.map(s => `<div class="soft-item">• ${esc(s)}</div>`).join('');
     const expHtml = data.experience.filter(e=>e.role).map(e => `
       <div class="exp-block">
-        <div class="exp-head"><span class="exp-role">${e.role}</span><span class="exp-date">${e.duration||''}</span></div>
-        <div class="exp-co">${e.company||''}</div>
-        ${e.description?`<div class="exp-desc">${e.description}</div>`:''}
+        <div class="exp-head"><span class="exp-role">${esc(e.role)}</span><span class="exp-date">${esc(e.duration||'')}</span></div>
+        <div class="exp-co">${esc(e.company||'')}</div>
+        ${e.description?`<div class="exp-desc">${esc(e.description)}</div>`:''}
       </div>`).join('');
     const projHtml = data.projects.filter(p=>p.name).map(p => `
       <div class="exp-block">
-        <div class="exp-head"><span class="exp-role">${p.name}</span>${p.tech?`<span class="exp-date">${p.tech}</span>`:''}</div>
-        ${p.url?`<div class="exp-co">${p.url}</div>`:''}
-        ${p.description?`<div class="exp-desc">${p.description}</div>`:''}
+        <div class="exp-head"><span class="exp-role">${esc(p.name)}</span>${p.tech?`<span class="exp-date">${esc(p.tech)}</span>`:''}</div>
+        ${p.url?`<div class="exp-co">${esc(p.url)}</div>`:''}
+        ${p.description?`<div class="exp-desc">${esc(p.description)}</div>`:''}
       </div>`).join('');
     const certHtml = data.certificates.filter(c=>c.name).map(c => `
-      <div class="cert-row"><span class="cert-dot"></span><span class="cert-name">${c.name}</span>${c.issuer||c.year?`<span class="cert-meta"> — ${[c.issuer,c.year].filter(Boolean).join(', ')}</span>`:''}</div>`).join('');
+      <div class="cert-row"><span class="cert-dot"></span><span class="cert-name">${esc(c.name)}</span>${c.issuer||c.year?`<span class="cert-meta"> — ${esc([c.issuer,c.year].filter(Boolean).join(', '))}</span>`:''}</div>`).join('');
 
     win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>${profile.name||'CV'} — Resume</title>
+<title>${esc(profile.name||'CV')} — Resume</title>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -215,12 +217,12 @@ body{background:#fff;font-family:'Roboto',sans-serif;font-size:10px;color:#464a4
 </style></head><body>
 <div class="page">
   <div class="header">
-    <div class="photo-box">${photo?`<img src="${photo}" alt="photo">`:(initials)}</div>
+    <div class="photo-box">${photo?`<img src="${esc(photo)}" alt="photo">`:(esc(initials))}</div>
     <div class="header-text">
-      <div class="h-dept">${deptTitle}</div>
-      <div class="h-name">${firstName}${lastName?' ':''}<strong>${lastName}</strong></div>
+      <div class="h-dept">${esc(deptTitle)}</div>
+      <div class="h-name">${esc(firstName)}${lastName?' ':''}<strong>${esc(lastName)}</strong></div>
       <div class="h-under"></div>
-      <div class="h-summary">${summaryText}</div>
+      <div class="h-summary">${esc(summaryText)}</div>
     </div>
   </div>
   <div class="body">
@@ -232,18 +234,18 @@ body{background:#fff;font-family:'Roboto',sans-serif;font-size:10px;color:#464a4
       ${data.softSkills.length>0?`<div><div class="sect-title">SOFT SKILLS</div><div class="sect-under"></div>${softHtml}</div>`:''}
       <div>
         <div class="sect-title">CONTACT</div><div class="sect-under"></div>
-        ${profile.phone?`<div class="contact-row">📞 ${profile.phone}</div>`:''}
-        ${profile.email?`<div class="contact-row">✉ ${profile.email}</div>`:''}
-        ${profile.address?`<div class="contact-row">📍 ${profile.address}</div>`:''}
-        ${data.github?`<div class="contact-row">🔗 ${data.github}</div>`:''}
-        ${data.linkedin?`<div class="contact-row">💼 ${data.linkedin}</div>`:''}
-        ${data.portfolio?`<div class="contact-row">🌐 ${data.portfolio}</div>`:''}
+        ${profile.phone?`<div class="contact-row">📞 ${esc(profile.phone)}</div>`:''}
+        ${profile.email?`<div class="contact-row">✉ ${esc(profile.email)}</div>`:''}
+        ${profile.address?`<div class="contact-row">📍 ${esc(profile.address)}</div>`:''}
+        ${data.github?`<div class="contact-row">🔗 ${esc(data.github)}</div>`:''}
+        ${data.linkedin?`<div class="contact-row">💼 ${esc(data.linkedin)}</div>`:''}
+        ${data.portfolio?`<div class="contact-row">🌐 ${esc(data.portfolio)}</div>`:''}
       </div>
       <div>
         <div class="sect-title">EDUCATION</div><div class="sect-under"></div>
         <div class="exp-role" style="font-size:9px">Daffodil International University</div>
         <div class="exp-co">Bachelor's Degree</div>
-        <div class="exp-date">${profile.studentId||''} ${profile.currentSemester?'· '+profile.currentSemester:''}</div>
+        <div class="exp-date">${esc(profile.studentId||'')} ${profile.currentSemester?'· '+esc(profile.currentSemester):''}</div>
       </div>
     </div>
     <div class="main">
